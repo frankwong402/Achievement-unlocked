@@ -19,6 +19,7 @@ src/
     ui/                                 # Visual templates
     lib/                                # Game state, XP, persistence
     data/                               # Offline Mock tasks
+    lib/evil-engine.mjs                 # Satirical Evil UX sequences
   lib/ai/
     provider.mjs                        # DeepSeek via AIHubMix
     prompts.mjs                         # B teammate's prompt ownership
@@ -69,3 +70,9 @@ The frontend still displays clearly labeled Mock data and saves locally under th
 ## Security
 
 Don't commit actual keys. The in-process rate limiter is best-effort only, not a distributed abuse-control solution. Protect real paid endpoints with appropriate Vercel Firewall/rate limits before enabling them.
+
+## Evil UX Lab (Track 2)
+
+The Quest Board includes a **separate, interactive seven-stage Evil UX Lab**: infinite 99.9% progress, surprise conditions, moving XP thresholds, near-complete lucky draws, simulated friend referrals, apparent progress rollback and simulated urgency countdown. The lab is always labeled **satirical/demo**; it does not send invites, erase progress, reduce earned XP, or claim real prizes. Only the demo stage and the progress bar presentation are affected. It is enabled by default and can be disabled from Settings. The existing task cards and quest flow are not redesigned.
+
+The reference WorkBuddy share page could not be opened from this environment; the implementation follows the Evil UX concepts agreed in the project conversation, rather than claiming a pixel-perfect copy.

@@ -1,6 +1,7 @@
 import {XP} from '../data/mock-content';
 import {esc} from './utils';
-import {createGoal, freshState, xp, getAllTasks, chapterProgress, realProgress, hiddenList, makeTask, templateFor} from './game-model';
+import {createGoal, makeHidden, xp, getAllTasks, chapterProgress, realProgress, hiddenList, makeTask, templateFor} from './game-model';
+import {evilScene, apparentProgress, advanceEvilScene, resetEvilScene} from './evil-engine.mjs';
 import {loadState, saveState} from './storage';
 import {createViews} from '../ui/views';
 
@@ -13,7 +14,7 @@ function persist(){try{saveState(s);}catch(e){notify('本地存储不可用，�
 function goal(){return s.goals.find(g=>g.id===s.selectedGoalId)||s.goals[0];}
 function chapter(){const g=goal();return g.chapters.find(c=>c.id===s.selectedChapterId)||g.chapters[0];}
 
-function shownProgress(value){return s.evilMode&&value>=99?'99.9':String(value);}
+function shownProgress(value){return apparentProgress(s,goal(),value);}
 
 function mockEvaluateHidden(g){const previously=new Set(hiddenList(g).filter(h=>h.unlocked).map(h=>h.id));const all=getAllTasks(g),completed=all.filter(t=>t.completed).length;hiddenList(g).forEach(h=>{let eligible=false;if(h.mockRule==='goal-completed-3')eligible=completed>=3;else if(h.mockRule==='chapter-completed-3'){const c=g.chapters.find(c=>c.id===h.chapterId);eligible=!!c&&c.tasks.filter(t=>t.completed).length>=3;}h.unlocked=eligible;});const newly=hiddenList(g).filter(h=>h.unlocked&&!previously.has(h.id));if(newly.length)notify('✦ HIDDEN ACHIEVEMENT UNLOCKED：'+newly.map(h=>h.title).join('、')+'（Mock AI）');}
 
@@ -28,7 +29,8 @@ function notify(message,isWarn=false){const n=document.getElementById('toast-con
 const {sidebar,header,dashboard,achievementsPage,reviewPage,settingsPage} = createViews({
   s, chapter, shownProgress,
   getOnlyCompleted:()=>onlyCompleted,
-  getAchievementTab:()=>achTab
+  getAchievementTab:()=>achTab,
+  getEvilScene:(g)=>evilScene(s,g)
 });
 function render(){const g=goal();document.getElementById('app').innerHTML=`<div class="shell">${sidebar(g)}<div class="workspace">${header(g)}<div class="content">${s.view==='achievements'?achievementsPage(g):s.view==='review'?reviewPage(g):s.view==='settings'?settingsPage(g):dashboard(g)}<div class="footer">ACHIEVEMENT UNLOCKED · HACKATHON TRACK 2 · INTERACTIVE HTML PROTOTYPE<br>MOCK DATA ONLY. No backend requests, no real AI judgment, no account required.</div></div></div></div><div id="modal-root"></div><div id="toast-container" role="status" aria-live="polite"></div>`;if(modal)renderModal();}
 function openModal(kind,taskId){modal={kind,taskId};renderModal();}
@@ -39,11 +41,13 @@ else if(modal.kind==='delete-task'){const t=c.tasks.find(t=>t.id===modal.taskId)
 else if(modal.kind==='regenerate'){body=`<div class="card-label">REGENERATE TASKS</div><h2>重新生成本章？</h2><p>保留所有已完成任务及普通成就，只替换未完成的任务。已解锁隐藏成就的保留策略在真实系统中仍需进一步审查。</p><div class="modal-actions"><button class="btn ghost" data-action="close-modal">取消</button><button class="btn warning" data-action="confirm-regen">Mock Regenerate</button></div>`;}
 root.innerHTML=`<div class="modal-bg" id="modal-overlay"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(modal.kind)}">${body}</div></div>`;setTimeout(()=>root.querySelector('input,textarea')?.focus(),30);}
 function getTask(idValue){return chapter().tasks.find(t=>t.id===idValue)}
-function act(element){const action=element.dataset.action,taskId=element.dataset.id,g=goal(),c=chapter();if(action==='view')setView(element.dataset.view);else if(action==='chapter')switchChapter(taskId);else if(action==='goal')switchGoal(taskId);else if(action==='new-goal')openModal('new-goal');else if(action==='close-modal')closeModal();else if(action==='evil'){s.evilMode=!s.evilMode;persist();render();notify(s.evilMode?'Evil UX 已开启：进度可能被故意卡在 99.9%。':'Evil UX 已关闭：现在显示真实进度。');}else if(action==='generate'||action==='load-more'){const n=generateTasks(g,c);render();notify('Mock AI：生成了 '+n+' 个任务。');}else if(action==='filter'){onlyCompleted=!onlyCompleted;render();}else if(action==='complete'){const t=getTask(taskId);if(!t)return;t.completed=!t.completed;t.achievement.unlocked=t.completed;mockEvaluateHidden(g);persist();render();if(t.completed)notify('任务已完成 · '+t.achievement.title+' · +'+(XP[t.difficulty].task+XP[t.difficulty].achievement)+' XP');else notify('任务完成已撤销，相关 XP 与成就已重新计算。',true);}else if(action==='edit-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify('已完成任务必须先撤销，才能编辑。',true);openModal('edit-task',taskId);}else if(action==='delete-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify('已完成任务必须先撤销，才能删除。',true);openModal('delete-task',taskId);}else if(action==='add-task')openModal('add-task');else if(action==='confirm-delete'){c.tasks=c.tasks.filter(t=>t.id!==modal.taskId);closeModal();mockEvaluateHidden(g);persist();render();notify('任务与对应普通成就已删除。');}else if(action==='regenerate')openModal('regenerate');else if(action==='confirm-regen'){const n=generateTasks(g,c,true);closeModal();render();notify('已保留完成任务，重新生成 '+n+' 个 Mock 任务。');}else if(action==='ach-tab'){achTab=element.dataset.tab;render();}}
+function act(element){const action=element.dataset.action,taskId=element.dataset.id,g=goal(),c=chapter();if(action==='view')setView(element.dataset.view);else if(action==='chapter')switchChapter(taskId);else if(action==='goal')switchGoal(taskId);else if(action==='new-goal')openModal('new-goal');else if(action==='close-modal')closeModal();else if(action==='evil'){s.evilMode=!s.evilMode;persist();render();notify(s.evilMode?'Evil UX 已开启：七种讽刺性交互效果上线。':'Evil UX 已关闭：现在显示真实进度。');}else if(action==='evil-next'){const next=advanceEvilScene(s,g);persist();render();notify('Evil UX · '+next.name+'（仅模拟，不改变真实任务和 XP）',true);}else if(action==='evil-reset'){resetEvilScene(s,g);persist();render();notify('Evil UX 演示已重置，实际进度没有变化。');}else if(action==='generate'||action==='load-more'){const n=generateTasks(g,c);render();notify('Mock AI：生成了 '+n+' 个任务。');}else if(action==='filter'){onlyCompleted=!onlyCompleted;render();}else if(action==='complete'){const t=getTask(taskId);if(!t)return;t.completed=!t.completed;t.achievement.unlocked=t.completed;mockEvaluateHidden(g);persist();render();if(t.completed)notify('任务已完成 · '+t.achievement.title+' · +'+(XP[t.difficulty].task+XP[t.difficulty].achievement)+' XP');else notify('任务完成已撤销，相关 XP 与成就已重新计算。',true);}else if(action==='edit-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify('已完成任务必须先撤销，才能编辑。',true);openModal('edit-task',taskId);}else if(action==='delete-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify('已完成任务必须先撤销，才能删除。',true);openModal('delete-task',taskId);}else if(action==='add-task')openModal('add-task');else if(action==='confirm-delete'){c.tasks=c.tasks.filter(t=>t.id!==modal.taskId);closeModal();mockEvaluateHidden(g);persist();render();notify('任务与对应普通成就已删除。');}else if(action==='regenerate')openModal('regenerate');else if(action==='confirm-regen'){const n=generateTasks(g,c,true);closeModal();render();notify('已保留完成任务，重新生成 '+n+' 个 Mock 任务。');}else if(action==='ach-tab'){achTab=element.dataset.tab;render();}}
 
 const handleClick=event=>{const target=event.target.closest('[data-action]');if(target){act(target);return;}if(event.target.id==='modal-overlay')closeModal();};
 const handleKeydown=event=>{if(event.key==='Escape'&&modal){closeModal();return;}if((event.key==='Enter'||event.key===' ')&&event.target.matches('[role="button"][data-action]')){event.preventDefault();act(event.target);}};
 const handleSubmit=event=>{if(event.target.id==='goal-form'){event.preventDefault();const form=event.target,description=String(new FormData(form).get('description')||'').trim();if(!description)return;const newGoal=createGoal(description,description.length>38?description.slice(0,38)+'…':description);s.goals.unshift(newGoal);s.selectedGoalId=newGoal.id;s.selectedChapterId=newGoal.chapters[0].id;s.view='dashboard';closeModal();persist();render();notify('新 Goal 已创建：章节大纲为 Mock 生成。');}else if(event.target.id==='task-form'){event.preventDefault();const f=new FormData(event.target),title=String(f.get('title')||'').trim(),desc=String(f.get('description')||'').trim(),difficulty=String(f.get('difficulty')||'medium'),achName=String(f.get('achievement')||'').trim();if(!title||!desc||!achName||!XP[difficulty])return;if(modal.kind==='edit-task'){const t=getTask(modal.taskId);if(!t||t.completed){notify('已完成任务不能直接修改。',true);return;}t.title=title;t.description=desc;t.difficulty=difficulty;t.achievement.title=achName;}else{const t=makeTask([title,desc,difficulty,achName]);chapter().tasks.push(t);chapter().generated=true;}closeModal();persist();render();notify('任务与对应 Achievement 已保存。');}};
+function tickEvilClock(){const el=document.querySelector('[data-evil-clock]');if(!el)return;const seconds=Math.max(0,Math.ceil((Number(el.dataset.deadline)-Date.now())/1000));el.textContent='00:'+String(seconds).padStart(2,'0');}
+const evilClockTimer=setInterval(tickEvilClock,1000);
 document.addEventListener('click',handleClick);
 document.addEventListener('keydown',handleKeydown);
 document.addEventListener('submit',handleSubmit);
@@ -54,5 +58,6 @@ return () => {
   document.removeEventListener('keydown',handleKeydown);
   document.removeEventListener('submit',handleSubmit);
   clearTimeout(toastTimer);
+  clearInterval(evilClockTimer);
 };
 }

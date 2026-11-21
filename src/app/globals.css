@@ -6,3 +6,24 @@
     @media(max-width:1160px){.shell{grid-template-columns:220px 1fr}.topbar{padding:0 26px}.content{padding:30px 25px 55px}.grid-main{grid-template-columns:minmax(0,1fr)}.right-column{display:grid;grid-template-columns:1fr 1fr;gap:17px}.stat-card{margin:0}.review-note{grid-column:1/-1;margin:0}}
     @media(max-width:740px){.shell{display:block}.sidebar{position:static;height:auto;min-height:0;border-right:0;border-bottom:1px solid #25313b}.logo{padding:15px 18px}.side-divider,.sidebar .section-label,.side-goal,.side-add,.chapter-links,.side-bottom{display:none}.side-nav{display:flex;padding:0 10px 10px}.side-btn{flex:1;margin:0 2px;padding:9px 8px;justify-content:center;font-size:11px;gap:6px;width:auto}.side-btn .ico{font-size:15px;width:auto}.topbar{height:auto;min-height:55px;padding:10px 15px;flex-wrap:wrap}.topright{gap:7px}.switch{font-size:10px}.pill{font-size:9px}.content{padding:24px 15px 45px}.hero-title{font-size:34px}.right-column{grid-template-columns:1fr}.ach-grid{grid-template-columns:1fr}.card-head{padding:20px 17px}.task{padding:14px 10px}.task-actions{flex-direction:column}.task-footer{padding:14px}.stat-card{padding:20px}.toast{left:14px;right:14px;bottom:14px;max-width:none}}
 
+
+/* Evil UX Lab — isolated presentation, no changes to task card visuals */
+.evil-lab{position:relative;overflow:hidden;margin:2px 0 24px;border:1px solid #81534f;border-radius:15px;background:radial-gradient(circle at 90% 0%,#512e3466,transparent 45%),linear-gradient(135deg,#241b27 0%,#1d212b 60%,#181c25 100%);box-shadow:0 12px 36px #0004}
+.evil-lab:before{position:absolute;content:"";width:300px;height:300px;right:-160px;top:-165px;border:1px solid #e5917838;border-radius:50%;pointer-events:none}
+.evil-lab-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 22px;border-bottom:1px solid #6740475c}
+.evil-lab-tag{font-size:10px;font-weight:850;letter-spacing:.12em;color:#ffb1aa}
+.evil-lab-counter{font-size:10px;font-family:ui-monospace,monospace;color:#ad8b97}
+.evil-lab-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(190px,.65fr);align-items:center;gap:18px;padding:23px 24px}
+.evil-lab-label{font-size:10px;font-weight:850;color:#f2b078;letter-spacing:.16em}
+.evil-lab h2{font-size:clamp(20px,2.5vw,28px);font-weight:900;line-height:1.2;letter-spacing:-.04em;margin:8px 0}
+.evil-lab p{font-size:12px;line-height:1.85;color:#cbb2b6;max-width:680px;margin:0}
+.evil-lab-buttons{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:20px}
+.evil-lab-buttons .btn.warning{border-color:#a36564;background:#65403e;color:#ffe1cc}
+.evil-lab-metric{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:150px;border:1px solid #80534c88;border-radius:12px;background:#130f18b5;text-align:center;padding:15px 8px;gap:11px}
+.evil-lab-symbol{color:#ffa599;font-size:22px;line-height:1}
+.evil-lab-metric strong{font-size:clamp(19px,2.3vw,30px);font-weight:900;color:#ffd4b6;letter-spacing:-.06em;word-break:break-word}
+.evil-lab-metric-label{font-size:8px;letter-spacing:.13em;color:#9e8f98;font-weight:800}
+.evil-lab-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 22px;background:#1c19218a;border-top:1px solid #5e42455c;font-size:10px;color:#ad9099;line-height:1.6}
+.evil-countdown{font-size:clamp(19px,2.3vw,30px);font-family:ui-monospace,monospace;font-weight:900;color:#ffd4b6}
+@media(max-width:740px){.evil-lab-grid{grid-template-columns:1fr;padding:18px}.evil-lab-top,.evil-lab-foot{padding:12px 16px}.evil-lab-metric{min-height:100px}.evil-lab-counter{white-space:nowrap}}
+@media(prefers-reduced-motion:reduce){.evil-lab *{animation:none!important;transition:none!important}}
