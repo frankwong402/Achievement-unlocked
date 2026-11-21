@@ -33,3 +33,43 @@ test("no JSON repair",()=>{
   assert.deepEqual(parseModelJson('{"ok":true}'),{ok:true});
   assert.throws(()=>parseModelJson('```json\n{"ok":true}\n```'));
 });
+
+import {completeJson} from "../src/lib/ai/provider.mjs";
+import {POST as postGoal} from "../src/app/api/goals/generate/route.js";
+import {GET as getStatus} from "../src/app/api/ai/status/route.js";
+test("live provider fails closed without Vercel activation",async()=>{
+  const previous=process.env.AI_LIVE_ENABLED;
+  process.env.AI_LIVE_ENABLED="false";
+  try {
+    await assert.rejects(completeJson([],(x)=>x),e=>e.code==="AI_DISABLED"&&e.status===503);
+  } finally {
+    if(previous===undefined)delete process.env.AI_LIVE_ENABLED;
+    else process.env.AI_LIVE_ENABLED=previous;
+  }
+});
+test("goal endpoint returns structured AI_DISABLED error, without spending tokens",async()=>{
+  const previous=process.env.AI_LIVE_ENABLED;
+  process.env.AI_LIVE_ENABLED="false";
+  try {
+    const request=new Request("https://example.test/api/goals/generate",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({goal:"Learn English"})
+    });
+    const response=await postGoal(request);
+    assert.equal(response.status,503);
+    assert.equal((await response.json()).error.code,"AI_DISABLED");
+  } finally {
+    if(previous===undefined)delete process.env.AI_LIVE_ENABLED;
+    else process.env.AI_LIVE_ENABLED=previous;
+  }
+});
+test("status endpoint is safe and does not disclose API Key",async()=>{
+  const response=await getStatus();
+  const content=await response.text();
+  assert.equal(response.status,200);
+  assert.ok(!content.includes("AIHUBMIX_API_KEY"));
+  assert.equal(JSON.parse(content).ai.model.length>0,true);
+});
+test("incomplete AI decisions cannot unlock hidden achievements",()=>{
+  assert.throws(()=>validateEvaluationOutput({decisions:[]},[{id:"a"}]));
+});

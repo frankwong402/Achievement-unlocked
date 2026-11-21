@@ -1,46 +1,71 @@
 # Achievement Unlocked
 
-A Hackathon Track 2 prototype built with Next.js App Router.
-
-## Run locally
-
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:3000. Build production using `npm run build`.
+Hackathon Track 2 — a Steam-like quest tracker with satirical Evil UX. Built with **Next.js App Router**.
 
 ## Project structure
 
 ```text
 src/
-  app/                       # Next.js routing, global CSS, page shell
+  app/
+    page.jsx                            # App UI entry
+    globals.css                         # Visual theme
+    api/
+      goals/generate/route.js           # POST generate goal/chapters
+      chapters/generate/route.js        # POST generate chapter tasks
+      achievements/evaluate/route.js    # POST semantic hidden judgment
+      ai/status/route.js                # GET safe status
   features/achievements/
-    components/              # Client-side app entry
-    data/                    # Mock goal, chapter and task content, XP rules
-    lib/                     # Game logic, state persistence and controller
-    ui/                      # Presentation templates
+    components/                         # Client UI
+    ui/                                 # Visual templates
+    lib/                                # Game state, XP, persistence
+    data/                               # Offline Mock tasks
+  lib/ai/
+    provider.mjs                        # DeepSeek via AIHubMix
+    prompts.mjs                         # B teammate's prompt ownership
+    schema.mjs                          # Stable JSON contract + validators
+    http.mjs                            # Errors / input / lightweight throttling
+docs/
+  API_CONTRACT.md                       # API requests, responses, status codes
+test/
+  ai-contract.test.mjs                  # Contract and safe-mode tests
 ```
 
-- `src/app/page.jsx` is the entry page. **No root `index.html` is used.**
-- `lib/storage.js` persists goals, task state, XP and Evil UX preferences in LocalStorage, maintaining the legacy key.
-- `lib/game-model.js` holds game object factories and pure progression calculations.
-- `data/mock-content.js` contains deterministic example content; **real AI API is not yet connected**.
-- `lib/controller.js` wires UI actions and mock hidden-achievement evaluation, while `ui/views.js` keeps view markup separate.
-- Evil UX is ON by default, and its switch appears **only under Settings**.
+The root HTML file is gone: Next.js serves the UI through `src/app/page.jsx`. D teammate owns UI; A teammate owns the `app/api` and `lib/ai` boundaries.
 
-## Deployment
+## Quick start
 
-The Vercel project is `achievement-unlocked` (production branch `main`).
-The profile project reverse-proxies exactly `https://www.frankwong.dev/achievement` to this app.
-Because the app is mounted via a cross-project rewrite at a subpath, production Next.js static assets use an absolute `assetPrefix` configured in `next.config.mjs`. This is distinct from the app's public URL.
+```sh
+npm install
+npm test
+npm run dev
+```
 
-## Next phase (not implemented)
+The production build (`npm run build`) runs tests before `next build`.
 
-- `src/app/api/goals/generate/route.js` — AI goal outline generation
-- `src/app/api/chapters/generate/route.js` — AI task generation
-- `src/app/api/achievements/evaluate/route.js` — semantic hidden achievement evaluation
-- Zod schemas and a provider adapter, after the event's API endpoint and contract are confirmed
+## AI setup
 
-Do not add API keys to the client bundle or Git. Keep credentials in Vercel environment variables.
+Copy variable **names** from `.env.example` into Vercel Production, without exposing real secrets in code:
+
+- `AIHUBMIX_API_KEY` — stored only as a sensitive Vercel environment variable
+- `AIHUBMIX_BASE_URL=https://aihubmix.com/v1`
+- `AIHUBMIX_MODEL=deepseek-v4-flash` (optional: provider also defaults to this ID)
+- `AI_LIVE_ENABLED=true` — **do not enable until** rate limiting, $12 credit controls and end-to-end testing are ready
+
+AI endpoints are present but **disabled by default** to prevent spending real credit unintentionally. `GET /api/ai/status` works without a billed request.
+
+## Current frontend limitations
+
+The frontend still displays clearly labeled Mock data and saves locally under the existing LocalStorage key, including progress and Evil UX toggle settings. **It is not yet connected to the new live API routes.** See `docs/API_CONTRACT.md` for D's integration contract.
+
+`https://www.frankwong.dev/achievement` is reverse-proxied from the profile project. The reverse proxy currently handles the homepage, **not** `/achievement/api/*`. Configure the API path proxy or a permitted API origin before live front-end integration. The Next.js `assetPrefix` remains configured for the standalone project.
+
+## Team responsibilities
+
+- **A (technical lead):** server API, AI provider, schemas, XP rules, deployment.
+- **B:** update prompts in `src/lib/ai/prompts.mjs`, keep JSON fields consistent.
+- **C:** test cases, achievement behavior, UX acceptance.
+- **D:** UI templates/components and API consumption, preserve LocalStorage progress.
+
+## Security
+
+Don't commit actual keys. The in-process rate limiter is best-effort only, not a distributed abuse-control solution. Protect real paid endpoints with appropriate Vercel Firewall/rate limits before enabling them.

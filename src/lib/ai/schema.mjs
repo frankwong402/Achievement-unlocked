@@ -91,6 +91,9 @@ export function validateEvaluationOutput(value, candidates) {
   if (new Set(decisions.map(d => d.id)).size !== decisions.length) {
     throw new ContractError("INVALID_SCHEMA", "Duplicate decision IDs");
   }
+  if (decisions.length !== candidates.length) {
+    throw new ContractError("INVALID_SCHEMA", "Missing achievement decisions");
+  }
   return {decisions};
 }
 export function validateGoalInput(value) {
