@@ -28,7 +28,10 @@ test('switching persists only the language and renders the saved board, badges a
     assert.match(v.settingsPage(g),/Local Storage/);
     assert.match(v.achievementsPage(g),/Secret condition/);
     assert.match(questSettingsDialog(g,true),/Confirm deletion/);
-    assert.match(rewardDialog({stage:3,spin:0},c,earned,true),/Draw a shard|Draw shard/);
+    const completedChapter={...c,tasks:c.tasks.map(task=>({...task,completed:true}))};
+    assert.match(rewardDialog({stage:0,flowVersion:2},completedChapter,earned,true),/Stamp the certificate/);
+    assert.match(rewardDialog({stage:1,flowVersion:2},completedChapter,earned,true),/Recalculate/);
+    assert.match(rewardDialog({stage:2,flowVersion:2},completedChapter,earned,true),/100%/);
     switchLanguage();
     assert.match(v.dashboard(g),/字母与发音/);
     assert.equal(JSON.stringify(s),saved);
