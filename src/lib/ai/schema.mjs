@@ -142,3 +142,19 @@ export function parseModelJson(content) {
     throw new ContractError("INVALID_AI_RESPONSE", "AI did not return valid JSON", 502);
   }
 }
+
+// Validate the entire response first, then retain only novel tasks in a follow-up batch.
+export function validateChapterBatch(value, existingTasks) {
+  const batch = validateChapterOutput(value);
+  const key = title => title.normalize('NFKC').trim().toLowerCase();
+  const existing = new Set(existingTasks.map(task => key(task.title)));
+  const tasks = batch.tasks.filter(task => {
+    const title = key(task.title);
+    if (existing.has(title)) return false;
+    existing.add(title);
+    return true;
+  });
+  if (!tasks.length)
+    throw new ContractError('INVALID_AI_RESPONSE', '本批任务全部重复，请重试。原有进度已保留。', 502);
+  return {...batch, tasks};
+}

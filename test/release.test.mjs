@@ -87,3 +87,14 @@ test('older public hints keep their flavor without displaying unlock instruction
   assert.equal(hiddenHint(h), h.description);
   assert.equal(h.condition,'本章完成一项任务');
 });
+
+import {validateChapterBatch} from '../src/lib/ai/schema.mjs';
+
+test('mixed follow-up batches keep new tasks and all-repeat batches fail before persistence',()=>{
+  const row={title:'Beans',description:'Identify beans',difficulty:'easy',achievementTitle:'Bean scout',completionCriteria:'List two varieties'};
+  const old=[{title:'ＢＥＡＮＳ',completed:true}];
+  const batch=validateChapterBatch({tasks:[row,{...row,title:'Brew'}]},old);
+  assert.deepEqual(batch.tasks.map(t=>t.title),['Brew']);
+  assert.throws(()=>validateChapterBatch({tasks:[row]},old),{code:'INVALID_AI_RESPONSE',status:502});
+  assert.equal(old[0].completed,true);
+});
