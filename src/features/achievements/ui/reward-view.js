@@ -33,13 +33,18 @@ export function rewardDialog(receipt, chapter, earned, evil) {
 
   if (evil && stage === 0) graphic = virtualSeal(false);
   if (evil && stage === 1) graphic = virtualSeal(true) + gauge(99.9);
-  if (finished) {
+  if (finished && chapterComplete) {
     display = '100%';
     graphic = virtualSeal(true) + gauge(100, true);
+  } else if (finished) {
+    // Normal-mode task rewards may be claimed before a chapter reaches 100%.
+    display = '✦';
+    graphic = '';
   }
 
+  const heading = finished && !chapterComplete ? label('任务徽章已领取', 'Task badge collected') : name;
   return `<div class="card-label">${finished ? label('章节完成凭证', 'CHAPTER COMPLETION RECEIPT') : label('暗黑体验 · 讽刺演示', 'DARK PATTERN · SATIRE')}</div>
-    <h2>${esc(name)}</h2>
+    <h2>${esc(heading)}</h2>
     <div class="reward-stage ${finished ? 'verified' : ''}">
       <strong>${display}</strong>${graphic}<p>${esc(detail)}</p>
     </div>
