@@ -50,7 +50,7 @@ test('last quest deletion persists an empty board and stale tabs cannot resurrec
     assert.equal(restored.selectedGoalId,null);
     assert.equal(restored.storageReadOnly,undefined);
     const views=createViews({s:restored});
-    assert.match(views.sidebar(undefined),/Quest Board/);
+    assert.match(views.sidebar(undefined),/任务板/);
     assert.match(views.header(undefined),/新目标/);
   } finally {delete global.window;}
 });

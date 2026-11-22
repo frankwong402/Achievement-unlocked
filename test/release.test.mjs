@@ -60,7 +60,7 @@ test('chapter audit reads real difficulty and leaves the completed chapter intac
   assert.match(rewardDialog(receipt,chapter,xp(goal),true),/data-action="audit-answer"/);
   assert.match(rewardDialog(receipt,chapter,xp(goal),false),/徽章已领取/);
   receipt.auditPassed=true;
-  assert.match(rewardDialog(receipt,chapter,xp(goal),true),/Infinite Progress/);
+  assert.match(rewardDialog(receipt,chapter,xp(goal),true),/无限进度/);
   assert.equal(JSON.stringify(goal),before);
   assert.deepEqual([0,42000,84000].map(time=>patinaLabel(0,time)),['闪耀','氧化中','已氧化']);
 });

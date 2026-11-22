@@ -55,3 +55,4 @@
 .task.done .task-check{animation:claim-check .3s ease-out}
 @keyframes claim-fill{from{transform:scaleX(.3)}}
 @keyframes claim-check{from{transform:scale(.8)}}
+.topbar .language-toggle{flex-shrink:0;white-space:nowrap}

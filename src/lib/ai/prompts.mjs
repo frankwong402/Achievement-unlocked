@@ -8,7 +8,7 @@ Keep a flexible chapter/task count based on scope, while respecting output limit
 Generate creative Steam-style achievement names and meaningful conditions.
 Hidden conditions must be verifiable from completed task titles and counts. Include one early discovery for completing the first task in scope. The public title and description are atmospheric clues. Never state the qualifying action, count, task title or threshold in those fields. Put that information only in condition.
 Do not include unsafe or deceptive real-world requirements such as making purchases or inviting friends.
-Keep titles and descriptions short. All output strings should match the requested language.`;
+Keep titles and descriptions short. Write titles, descriptions, criteria and conditions in the requested language (en = English, zh = Simplified Chinese), even when the input or earlier tasks use another language. Preserve JSON keys, schema enum values and IDs.`;
 export function goalMessages({goal,language}) {
   return [
     {role:"system",content:shared + `\nOutput schema:

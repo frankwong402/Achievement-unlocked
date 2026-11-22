@@ -1,3 +1,4 @@
+import {label} from './locale.js';
 import { freshState } from './game-model.js';
 
 // Keep this key unchanged across the migration so existing user progress survives.
@@ -31,10 +32,10 @@ export function loadState() {
 }
 
 export function saveState(state, next = state) {
-  if(state.storageReadOnly) throw Error("Original save is protected");
+  if(state.storageReadOnly) throw Error(label("原始存档已受保护。", "Original save is protected"));
   const storage = window.localStorage;
   if (snapshots.has(state) && storage.getItem(STORAGE_KEY) !== snapshots.get(state))
-    throw Error('另一标签页已更新存档，请刷新后再试。');
+    throw Error(label("另一标签页已更新存档，请刷新后再试。", "Another tab updated your save. Refresh and try again."));
   const raw = JSON.stringify(next);
   storage.setItem(STORAGE_KEY, raw);
   snapshots.set(state, raw);
