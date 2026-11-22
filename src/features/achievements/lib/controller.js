@@ -22,10 +22,8 @@ function goal(){return s.goals.find(g=>g.id===s.selectedGoalId)||s.goals[0];}
 function chapter(){const g=goal();return g?.chapters.find(c=>c.id===s.selectedChapterId)||g?.chapters[0];}
 
 function shownProgress(value) {
-  if (!s.evilMode || !value) return value;
-  const r=offer(s,goal(),chapter());
-  if (r.stage===5) return Math.round(value*.76);
-  return value===100 && r.stage!==7 ? '99.'+'9'.repeat(1+Math.min(r.presses,3)) : value;
+  // Chapter progress always reflects actual completed tasks, including 100%.
+  return value;
 }
 let rustPreview=false;
 let pending='', failure=null, retry=null, alive=true;
@@ -57,6 +55,7 @@ async function checkSecrets(g,c) {
   if(titles.length)notify(label("隐藏成就 · ", "Hidden achievement · ")+titles.join(' / ')+' · +'+(xp(g)-previous)+' XP');
 }
 function setTask(g,c,t) {
+  const wasChapterComplete=c.tasks.length>0 && c.tasks.every(task=>task.completed);
   const previous=xp(g);
   t.completed=!t.completed;t.achievement.unlocked=t.completed;
   if(t.completed){
@@ -64,7 +63,13 @@ function setTask(g,c,t) {
     t.completedAt=Date.now();t.polishedAt=t.completedAt;
     const oldest=getAllTasks(g).filter(other=>other!==t&&other.completed).sort((a,b)=>(a.polishedAt||0)-(b.polishedAt||0))[0];
     if(oldest&&s.evilMode)oldest.polishedAt=t.completedAt;
-    if(s.evilMode){const r=offer(s,g,c);if(r.stage===7)Object.assign(r,{stage:0,presses:0,spin:0,boosts:0});}
+  }
+  const chapterComplete=c.tasks.length>0 && c.tasks.every(task=>task.completed);
+  const justFinished=!wasChapterComplete && chapterComplete;
+  // Reopening a chapter resets its cosmetic receipt, never its XP or task ledger.
+  if(!t.completed || justFinished){
+    const r=offer(s,g,c);
+    r.stage=0;r.flowVersion=2;
   }
   if(isLiveGoal(g))c.evaluationPending=true;
   persist();render();
@@ -72,10 +77,10 @@ function setTask(g,c,t) {
   const level=Math.floor(xp(g)/1000)>Math.floor(previous/1000) ? ` · ${label("升级", "LEVEL UP")}` : '';
   const copy=taskCopies(g,t)?.[currentLocale()] ?? originalText(t);
   notify((t.completed?copy.achievementTitle:label("已撤销 ", "Undone · ")+copy.title)+' · '+(delta>=0?'+':'')+delta+' XP'+level);
+  if(justFinished && s.evilMode)openModal('reward');
   if(isLiveGoal(g))run(label("判定隐藏成就…", "Checking hidden achievements…"),()=>checkSecrets(g,c));
   else {mockEvaluateHidden(g);persist();render();}
 }
-
 function mockEvaluateHidden(g){const previously=new Set(hiddenList(g).filter(h=>h.unlocked).map(h=>h.id));const all=getAllTasks(g),completed=all.filter(t=>t.completed).length;hiddenList(g).forEach(h=>{let eligible=false;if(h.mockRule==='goal-completed-3')eligible=completed>=3;else if(h.mockRule==='chapter-completed-3'){const c=g.chapters.find(c=>c.id===h.chapterId);eligible=!!c&&c.tasks.filter(t=>t.completed).length>=3;}h.unlocked=eligible;});const newly=hiddenList(g).filter(h=>h.unlocked&&!previously.has(h.id));if(newly.length)notify(`✦ ${label("隐藏成就解锁：", "HIDDEN ACHIEVEMENT UNLOCKED：")}`+newly.map(h=>h.title).join('、')+ '');}
 
 function generateTasks(g,c,regenerate=false){const template=templateFor(g,c);if(regenerate){c.tasks=c.tasks.filter(t=>t.completed);c.batches=0;}const used=new Set(c.tasks.map(t=>t.title));let added=0;let source=template.filter(r=>!used.has(r[0]));const want=regenerate?4:Math.min(c.generated?2:4,source.length);for(const row of source.slice(0,want)){c.tasks.push(makeTask(row));added++;}
@@ -135,16 +140,11 @@ if(action==='quest-settings'||action==='delete-quest')return openModal(action);
 if(action==='confirm-delete-quest' && modal?.kind==='delete-quest')return applyQuestSettings(() => deleteQuest(s, modal.goalId));
 if(action==='retry'){if(modal?.kind==='new-goal')return document.getElementById('goal-form').requestSubmit();return retry?.();}
 if(action==='check-secrets')return run(label("判定隐藏成就…", "Checking hidden achievements…"),()=>checkSecrets(g,c));
-if(action==='claim'){if(!s.evilMode){offer(s,g,c).normalClaimed=true;persist();}return openModal('reward');}
-if(action==='audit-answer'){
-  if(element.dataset.choice==='threshold'){offer(s,g,c).auditPassed=true;persist();render();}
-  else notify(label("任务完成记录已封存。再看看领奖门槛。", "Your completed tasks are recorded. Check the reward threshold again."),true);
-  return;
-}
+if(action==='claim'){if(s.evilMode && (!c.tasks.length || c.tasks.some(t=>!t.completed)))return; if(!s.evilMode){offer(s,g,c).normalClaimed=true;persist();}return openModal('reward');}
 if(action==='preview-rust'){rustPreview=!rustPreview;render();return;}
 if(action==='reward-step'){rewardStep(offer(s,g,c),xp(g));persist();render();return;}
-if(action==='replay-reward'){Object.assign(offer(s,g,c),{stage:0,presses:0,spin:0,boosts:0,auditPassed:false});persist();render();return;}
-if(action==='view')setView(element.dataset.view);else if(action==='chapter')switchChapter(taskId);else if(action==='goal')switchGoal(taskId);else if(action==='new-goal')openModal('new-goal');else if(action==='close-modal')closeModal();else if(action==='evil'){s.evilMode=!s.evilMode;persist();render();notify(s.evilMode?label("Evil UX 已开启：七种讽刺性交互效果上线。", "Evil UX is on."):label("Evil UX 已关闭：现在显示真实进度。", "Evil UX is off. Showing actual progress."));}else if(action==='generate'||action==='load-more')return run(label("准备本章任务…", "Preparing chapter tasks…"),()=>loadBatch(g,c));else if(action==='filter'){onlyCompleted=!onlyCompleted;render();}else if(action==='complete'){const t=getTask(taskId);if(!t)return;setTask(g,c,t);}else if(action==='edit-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify(label("已完成任务必须先撤销，才能编辑。", "Undo completion before editing this task."),true);openModal('edit-task',taskId);}else if(action==='delete-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify(label("已完成任务必须先撤销，才能删除。", "Undo completion before deleting this task."),true);openModal('delete-task',taskId);}else if(action==='add-task')openModal('add-task');else if(action==='confirm-delete'){c.tasks=c.tasks.filter(t=>t.id!==modal.taskId);closeModal();persist();render();notify(label("任务与对应普通成就已删除。", "Task and linked achievement deleted."));}else if(action==='regenerate')openModal('regenerate');else if(action==='confirm-regen'){return run(label("正在更新任务…", "Updating tasks…"),async()=>{await loadBatch(g,c,true);closeModal();});}else if(action==='ach-tab'){achTab=element.dataset.tab;render();}}
+if(action==='replay-reward'){Object.assign(offer(s,g,c),{stage:0,flowVersion:2});persist();render();return;}
+if(action==='view')setView(element.dataset.view);else if(action==='chapter')switchChapter(taskId);else if(action==='goal')switchGoal(taskId);else if(action==='new-goal')openModal('new-goal');else if(action==='close-modal')closeModal();else if(action==='evil'){s.evilMode=!s.evilMode;persist();render();notify(s.evilMode?label("Evil UX 已开启：章节盖章与进度重算。", "Evil UX enabled: virtual stamp and progress recalculation."):label("Evil UX 已关闭：现在显示真实进度。", "Evil UX is off. Showing actual progress."));}else if(action==='generate'||action==='load-more')return run(label("准备本章任务…", "Preparing chapter tasks…"),()=>loadBatch(g,c));else if(action==='filter'){onlyCompleted=!onlyCompleted;render();}else if(action==='complete'){const t=getTask(taskId);if(!t)return;setTask(g,c,t);}else if(action==='edit-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify(label("已完成任务必须先撤销，才能编辑。", "Undo completion before editing this task."),true);openModal('edit-task',taskId);}else if(action==='delete-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify(label("已完成任务必须先撤销，才能删除。", "Undo completion before deleting this task."),true);openModal('delete-task',taskId);}else if(action==='add-task')openModal('add-task');else if(action==='confirm-delete'){c.tasks=c.tasks.filter(t=>t.id!==modal.taskId);closeModal();persist();render();notify(label("任务与对应普通成就已删除。", "Task and linked achievement deleted."));}else if(action==='regenerate')openModal('regenerate');else if(action==='confirm-regen'){return run(label("正在更新任务…", "Updating tasks…"),async()=>{await loadBatch(g,c,true);closeModal();});}else if(action==='ach-tab'){achTab=element.dataset.tab;render();}}
 
 const handleClick=event=>{const target=event.target.closest('[data-action]');if(target){act(target);return;}if(!pending&&event.target.id==='modal-overlay')closeModal();};
 const handleKeydown=event=>{if(pending)return;if(event.key==='Escape'&&modal){closeModal();return;}if((event.key==='Enter'||event.key===' ')&&event.target.matches('[role="button"][data-action]')){event.preventDefault();act(event.target);}};
@@ -166,7 +166,7 @@ return run(label("DeepSeek 正在规划章节…", "DeepSeek is planning your ch
   const data=await requestQuest('goals/generate',{goal:description});
   const g=generatedGoal(description,data);s.goals.unshift(g);s.selectedGoalId=g.id;s.selectedChapterId=g.chapters[0].id;s.view='dashboard';closeModal();persist();notify(label("Quest 已创建 · ", "Quest created · ")+g.chapters.length+label(" 个章节", " chapters"));
 });}else if(event.target.id==='task-form'){event.preventDefault();const f=new FormData(event.target),title=String(f.get('title')||'').trim(),desc=String(f.get('description')||'').trim(),difficulty=String(f.get('difficulty')||'medium'),achName=String(f.get('achievement')||'').trim();if(!title||!desc||!achName||!XP[difficulty])return;if(modal.kind==='edit-task'){const t=getTask(modal.taskId);if(!t||t.completed){notify(label("已完成任务不能直接修改。", "Undo completion to edit this task."),true);return;}if(t.title!==title || t.description!==desc || t.achievement.title!==achName)delete t.locales;t.title=title;t.description=desc;t.difficulty=difficulty;t.achievement.title=achName;}else{const t=makeTask([title,desc,difficulty,achName]);chapter().tasks.push(t);chapter().generated=true;}closeModal();persist();render();notify(label("任务与对应 Achievement 已保存。", "Task and achievement saved."));}};
-function tickEvilClock(){for(const el of document.querySelectorAll('[data-patina]')){const patina=patinaLabel(Number(el.dataset.patina),Date.now()+(rustPreview?84000:0));el.textContent=patina;el.classList.toggle('tarnished',patina!==label("闪耀", "Polished"));el.title=label("演示时间每 12 秒过一天，完成任务可擦亮一枚旧徽章。", "Every 12 seconds simulates one day. Complete a task to polish an old badge.");}const el=document.querySelector('[data-evil-clock]');if(!el)return;const seconds=Math.max(0,Math.ceil((Number(el.dataset.deadline)-Date.now())/1000));el.textContent=seconds?'00:'+String(seconds).padStart(2,'0'):label("已过期 · 仍可领取", "Expired · Still claimable");}
+function tickEvilClock(){for(const el of document.querySelectorAll('[data-patina]')){const patina=patinaLabel(Number(el.dataset.patina),Date.now()+(rustPreview?84000:0));el.textContent=patina;el.classList.toggle('tarnished',patina!==label("闪耀", "Polished"));el.title=label("演示时间每 12 秒过一天，完成任务可擦亮一枚旧徽章。", "Every 12 seconds simulates one day. Complete a task to polish an old badge.");}}
 const evilClockTimer=setInterval(tickEvilClock,1000);
 const selectGoal=e=>{if(e.target.id==='goal-picker'&&!pending)switchGoal(e.target.value);};
 document.addEventListener('change',selectGoal);
