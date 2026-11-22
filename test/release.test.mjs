@@ -58,7 +58,7 @@ test('legacy settings and progress survive, unreadable data remains intact',()=>
   raw='{';const recovering=loadState();assert.throws(()=>saveState(recovering));assert.equal(raw,'{');delete global.window;
 });
 
-import {chapterAudit, patinaLabel} from '../src/features/achievements/lib/reward.mjs';
+import {chapterAudit, patinaLabel, patinaState, DAY_MS, polishAchievement, autoPolishAchievement} from '../src/features/achievements/lib/reward.mjs';
 import {rewardDialog} from '../src/features/achievements/ui/reward-view.js';
 import {requestCompletion} from '../src/lib/ai/provider.mjs';
 import {validateGoalOutput} from '../src/lib/ai/schema.mjs';
@@ -85,8 +85,53 @@ test('chapter completion dialog shows only a stamp and a final 100 percent recei
   assert.doesNotMatch(complete,/data-action="reward-step"/);
   assert.match(rewardDialog(receipt,chapter,xp(goal),false),/100%/);
   assert.equal(JSON.stringify(goal),before);
-  assert.deepEqual([0,42000,84000].map(time=>patinaLabel(0,time)),['闪耀','氧化中','已氧化']);
+  assert.deepEqual([0,12*60*60*1000,DAY_MS].map(time=>patinaLabel(0,time)),['闪耀','氧化中','已氧化']);
 });
+
+test('real 24-hour oxidation stages are independent of the demo clock',()=>{
+  assert.equal(DAY_MS,86400000);
+  assert.equal(patinaState(1000,1000+DAY_MS/2-1),'polished');
+  assert.equal(patinaState(1000,1000+DAY_MS/2),'tarnishing');
+  assert.equal(patinaState(1000,1000+DAY_MS-1),'tarnishing');
+  assert.equal(patinaState(1000,1000+DAY_MS),'tarnished');
+  assert.equal(patinaState(1000,1000+7*DAY_MS),'tarnished');
+});
+
+test('hand polishing targets only unlocked regular badges and preserves XP',()=>{
+  const s=freshState(),g=s.goals[0],c=g.chapters[0],t=c.tasks[0],now=200000000;
+  t.completed=true;t.achievement.unlocked=true;t.polishedAt=now-DAY_MS;
+  const earned=xp(g),beforeCompleted=t.completed,beforeUnlocked=t.achievement.unlocked;
+  assert.equal(patinaState(t.polishedAt,now),'tarnished');
+  assert.equal(polishAchievement(g,'not-a-badge',now),null);
+  assert.equal(polishAchievement(g,c.tasks[1].achievement.id,now),null);
+  assert.equal(polishAchievement(g,t.achievement.id,now),t);
+  assert.equal(t.polishedAt,now);
+  assert.equal(patinaState(t.polishedAt,now),'polished');
+  assert.equal(xp(g),earned);
+  assert.equal(t.completed,beforeCompleted);
+  assert.equal(t.achievement.unlocked,beforeUnlocked);
+});
+
+test('new task automatically polishes the oldest other unlocked badge',()=>{
+  const s=freshState(),g=s.goals[0],[old,other,newest]=g.chapters[0].tasks,now=300000000;
+  old.completed=other.completed=true;
+  old.achievement.unlocked=other.achievement.unlocked=true;
+  old.polishedAt=now-3*DAY_MS;
+  other.polishedAt=now-2*DAY_MS;
+  newest.completed=newest.achievement.unlocked=true;
+  newest.polishedAt=now;
+  const earned=xp(g),oldOriginalCompleted=old.completed;
+  const polished=autoPolishAchievement(g,newest,now);
+  assert.equal(polished.task,old);
+  assert.equal(polished.statusBefore,'tarnished');
+  assert.equal(old.polishedAt,now);
+  assert.equal(other.polishedAt,now-2*DAY_MS);
+  assert.equal(newest.polishedAt,now);
+  assert.equal(old.completed,oldOriginalCompleted);
+  assert.equal(xp(g),earned);
+  assert.equal(autoPolishAchievement(g,{completed:false},now),null);
+});
+
 test('provider returns typed errors for timeout, authorization and invalid model JSON',async()=>{
   const config={base:'https://example.test',messages:[],maxTokens:100};
   const scenarios=[

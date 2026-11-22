@@ -3,7 +3,7 @@ import {label, currentLocale, loadLanguage, switchLanguage} from './locale.js';
 import {XP} from '../data/mock-content.js';
 import {esc} from './utils.js';
 import { makeHidden, xp, getAllTasks, chapterProgress, realProgress, hiddenList, makeTask, templateFor} from './game-model.js';
-import {offer,rewardStep,patinaLabel} from './reward.mjs';
+import {offer,rewardStep,patinaLabel,patinaState,DAY_MS,polishAchievement,autoPolishAchievement} from './reward.mjs';
 import {requestQuest,isLiveGoal,generatedGoal,mergeChapter,evaluateGoal} from './quest-api.js';
 import {loadState, saveState} from './storage.js';
 import {rewardDialog} from '../ui/reward-view.js';
@@ -57,12 +57,13 @@ async function checkSecrets(g,c) {
 function setTask(g,c,t) {
   const wasChapterComplete=c.tasks.length>0 && c.tasks.every(task=>task.completed);
   const previous=xp(g);
+  let autoPolishRestored=false;
   t.completed=!t.completed;t.achievement.unlocked=t.completed;
   if(t.completed){
     offer(s,g,c).normalClaimed=false;
     t.completedAt=Date.now();t.polishedAt=t.completedAt;
-    const oldest=getAllTasks(g).filter(other=>other!==t&&other.completed).sort((a,b)=>(a.polishedAt||0)-(b.polishedAt||0))[0];
-    if(oldest&&s.evilMode)oldest.polishedAt=t.completedAt;
+    const autoPolish=autoPolishAchievement(g,t,t.completedAt);
+    autoPolishRestored=!!autoPolish && autoPolish.statusBefore!=='polished';
   }
   const chapterComplete=c.tasks.length>0 && c.tasks.every(task=>task.completed);
   const justFinished=!wasChapterComplete && chapterComplete;
@@ -76,7 +77,7 @@ function setTask(g,c,t) {
   const delta=xp(g)-previous;
   const level=Math.floor(xp(g)/1000)>Math.floor(previous/1000) ? ` · ${label("升级", "LEVEL UP")}` : '';
   const copy=taskCopies(g,t)?.[currentLocale()] ?? originalText(t);
-  notify((t.completed?copy.achievementTitle:label("已撤销 ", "Undone · ")+copy.title)+' · '+(delta>=0?'+':'')+delta+' XP'+level);
+  notify((t.completed?copy.achievementTitle:label("已撤销 ", "Undone · ")+copy.title)+' · '+(delta>=0?'+':'')+delta+' XP'+level+(autoPolishRestored?label(" · 旧徽章已自动擦亮"," · Older badge auto-polished"):''));
   if(justFinished && s.evilMode)openModal('reward');
   if(isLiveGoal(g))run(label("判定隐藏成就…", "Checking hidden achievements…"),()=>checkSecrets(g,c));
   else {mockEvaluateHidden(g);persist();render();}
@@ -109,6 +110,7 @@ function render() {
   root.querySelectorAll('button,select,textarea,input').forEach(el=>{if(pending)el.disabled=true;});
 }
 function openModal(kind,taskId){failure=null;retry=null;modal={kind,taskId,goalId:goal()?.id};renderModal();}
+function findPolishable(g,badgeId){return g&&getAllTasks(g).find(t=>t.completed&&t.achievement?.unlocked&&t.achievement.id===badgeId);}
 function closeModal(){document.querySelector('#app .shell')?.removeAttribute('inert');modal=null;failure=null;retry=null;document.getElementById('modal-root').innerHTML='';feedback();}
 function renderModal(){const root=document.getElementById('modal-root');if(!modal){root.innerHTML='';return;}document.querySelector('#app .shell')?.setAttribute('inert','');let body='';const g=goal(),c=chapter();if(modal.kind==='new-goal'){body=`<div class="card-label">${label("创建新征途", "CREATE A NEW QUEST")}</div><h2>${label("你想达成什么目标？", "What do you want to achieve?")}</h2><p>${label("写下你的起点和目标，DeepSeek 将为你规划章节。", "Describe your starting point and goal. DeepSeek will plan your chapters.")}</p><form id="goal-form"><label class="field-label" for="goal-description">${label("目标描述", "GOAL DESCRIPTION")}</label><textarea id="goal-description" name="description" class="field" placeholder="${label("例如：我想从零开始学 Python，做出一个自己的项目", "For example, learn Python from scratch and build my first project")}" maxlength="600" minlength="3" required>${esc(modal.draft||'')}</textarea><div class="modal-actions"><button type="button" class="btn ghost" data-action="close-modal">${label("取消", "Cancel")}</button><button type="submit" class="btn primary">${label("生成 Quest →", "Generate quest →")}</button></div></form>`;}
 else if(modal.kind==='quest-settings'||modal.kind==='delete-quest'){body=questSettingsDialog(g,modal.kind==='delete-quest');}
@@ -118,7 +120,99 @@ else if(modal.kind==='regenerate'){body=`<div class="card-label">${label("重新
 else if(modal.kind==='reward'){
   body=rewardDialog(offer(s,g,c),c,xp(g),s.evilMode);
 }
-root.innerHTML=`<div class="modal-bg" id="modal-overlay"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(modal.kind)}">${body}<div class="modal-feedback"></div></div></div>`;setTimeout(()=>(root.querySelector('input,textarea')||root.querySelector('button'))?.focus(),30);}
+else if(modal.kind==='polish'){
+  const badge=findPolishable(g,modal.taskId);
+  body=badge?`<div class="card-label">${label("手动保养 · 成就徽章", "ACHIEVEMENT CARE · HAND POLISH")}</div>
+    <h2>${label("Polish Achievement · 擦亮成就", "Polish Achievement")}</h2>
+    <p>${esc(badge.achievement.title)} · ${label("用鼠标或手指反复擦拭，去掉氧化层。", "Rub the badge with your mouse or finger to remove its patina.")}</p>
+    <div class="polish-station">
+      <div class="polish-medal"><div class="polish-medal-core" aria-hidden="true"><span>✦</span><small>${label("闪耀归来", "SHINE RESTORED")}</small></div>
+        <canvas id="polish-canvas" class="polish-canvas" width="240" height="240" aria-label="${label("按住并擦拭徽章氧化层", "Press and rub the badge to remove its tarnish")}"></canvas></div>
+      <div class="polish-meter"><div class="claim-gauge"><i id="polish-meter-fill" style="width:0%"></i></div>
+        <strong id="polish-percent" aria-live="polite">0%</strong></div>
+      <p class="polish-tip">${label("擦亮后重新开始 24 小时氧化倒计时，不影响 XP。", "Polishing restarts the real 24-hour tarnish cycle without changing XP.")}</p>
+    </div>
+    <div class="modal-actions"><button class="btn ghost" data-action="close-modal">${label("取消", "Cancel")}</button>
+      <button class="btn small ghost" data-action="polish-accessible">${label("用按钮擦亮（无拖动）", "Polish without dragging")}</button></div>`:`<p>${label("这枚成就已不可擦亮。", "This badge is not available for polishing.")}</p>
+    <button class="btn ghost" data-action="close-modal">${label("返回", "Back")}</button>`;
+}
+root.innerHTML=`<div class="modal-bg" id="modal-overlay"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(modal.kind)}">${body}<div class="modal-feedback"></div></div></div>`;
+if(modal.kind==='polish')initPolishCanvas();
+setTimeout(()=>(root.querySelector('input,textarea')||root.querySelector('button'))?.focus(),30);}
+
+// Pointer-capable, scratch-to-reveal polish. Counts unique brushed regions so
+// dragging in one spot never claims a full restoration.
+function finishManualPolish(){
+  if(modal?.kind!=='polish'||pending)return;
+  const g=goal();
+  if(g?.id!==modal.goalId)return closeModal();
+  const task=polishAchievement(g,modal.taskId,Date.now());
+  if(!task)return closeModal();
+  rustPreview=false;
+  if(!persist())return;
+  closeModal();render();
+  notify(label("成就已擦亮 · 24 小时后重新氧化", "Badge polished · 24-hour cycle restarted"));
+}
+function initPolishCanvas(){
+  const canvas=document.getElementById('polish-canvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  if(!ctx)return;
+  const center=120,radius=110,brush=25,size=240,grid=15;
+  const gradient=ctx.createRadialGradient(92,78,12,120,120,114);
+  gradient.addColorStop(0,'#cb9260');gradient.addColorStop(.52,'#85654e');gradient.addColorStop(1,'#3e5546');
+  ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(center,center,radius,0,Math.PI*2);ctx.fill();
+  for(let i=0;i<130;i++){
+    const angle=i*2.39996323,dist=Math.sqrt(((i*53)%137)/137)*104;
+    ctx.fillStyle=i%3===0?'#c1a17e80':'#304d3b7a';
+    ctx.beginPath();ctx.arc(center+Math.cos(angle)*dist,center+Math.sin(angle)*dist,i%4+1,0,Math.PI*2);ctx.fill();
+  }
+  ctx.textAlign='center';ctx.fillStyle='#f5d3a0';ctx.font='bold 15px sans-serif';
+  ctx.fillText(label('已氧化', 'TARNISHED'),center,center+5);
+  const valid=[];
+  for(let row=0;row<grid;row++)for(let col=0;col<grid;col++){
+    const x=(col+.5)*size/grid,y=(row+.5)*size/grid;
+    if((x-center)**2+(y-center)**2<102**2)valid.push({x,y,key:col+','+row});
+  }
+  const cleared=new Set(),fill=document.getElementById('polish-meter-fill'),display=document.getElementById('polish-percent');
+  let activePointer=null,last=null,complete=false;
+  function scrub(x,y){
+    if(complete)return;
+    ctx.save();ctx.globalCompositeOperation='destination-out';
+    ctx.beginPath();ctx.arc(x,y,brush,0,Math.PI*2);ctx.fill();ctx.restore();
+    for(const p of valid)if((p.x-x)**2+(p.y-y)**2<(brush+7)**2)cleared.add(p.key);
+    const percent=Math.min(100,Math.round(cleared.size/valid.length*100));
+    if(fill)fill.style.width=percent+'%';
+    if(display)display.textContent=percent+'%';
+    if(percent>=38){complete=true;finishManualPolish();}
+  }
+  const point=e=>{
+    const rect=canvas.getBoundingClientRect();
+    return {x:(e.clientX-rect.left)*size/Math.max(rect.width,1),y:(e.clientY-rect.top)*size/Math.max(rect.height,1)};
+  };
+  canvas.addEventListener('pointerdown',e=>{
+    if(complete)return;
+    e.preventDefault();activePointer=e.pointerId;
+    canvas.setPointerCapture?.(e.pointerId);
+    last=point(e);scrub(last.x,last.y);
+  });
+  canvas.addEventListener('pointermove',e=>{
+    if(complete||activePointer!==e.pointerId||!last)return;
+    e.preventDefault();
+    const next=point(e),distance=Math.hypot(next.x-last.x,next.y-last.y);
+    const steps=Math.max(1,Math.ceil(distance/8));
+    const previous=last;
+    for(let i=1;i<=steps&&!complete;i++){
+      const f=i/steps;
+      scrub(previous.x+(next.x-previous.x)*f,previous.y+(next.y-previous.y)*f);
+    }
+    last=next;
+  });
+  const end=e=>{if(activePointer===e.pointerId){activePointer=null;last=null;}};
+  canvas.addEventListener('pointerup',end);
+  canvas.addEventListener('pointercancel',end);
+}
+
 function getTask(idValue){return chapter().tasks.find(t=>t.id===idValue)}
 function act(element){const action=element.dataset.action,taskId=element.dataset.id,g=goal(),c=chapter();if(pending)return;
 if(action==='translate-task'){
@@ -142,6 +236,8 @@ if(action==='retry'){if(modal?.kind==='new-goal')return document.getElementById(
 if(action==='check-secrets')return run(label("判定隐藏成就…", "Checking hidden achievements…"),()=>checkSecrets(g,c));
 if(action==='claim'){if(s.evilMode && (!c.tasks.length || c.tasks.some(t=>!t.completed)))return; if(!s.evilMode){offer(s,g,c).normalClaimed=true;persist();}return openModal('reward');}
 if(action==='preview-rust'){rustPreview=!rustPreview;render();return;}
+if(action==='polish'){if(!s.evilMode||!findPolishable(g,taskId))return;rustPreview=false;return openModal('polish',taskId);}
+if(action==='polish-accessible'){return finishManualPolish();}
 if(action==='reward-step'){rewardStep(offer(s,g,c),xp(g));persist();render();return;}
 if(action==='replay-reward'){Object.assign(offer(s,g,c),{stage:0,flowVersion:2});persist();render();return;}
 if(action==='view')setView(element.dataset.view);else if(action==='chapter')switchChapter(taskId);else if(action==='goal')switchGoal(taskId);else if(action==='new-goal')openModal('new-goal');else if(action==='close-modal')closeModal();else if(action==='evil'){s.evilMode=!s.evilMode;persist();render();notify(s.evilMode?label("Evil UX 已开启：章节盖章与进度重算。", "Evil UX enabled: virtual stamp and progress recalculation."):label("Evil UX 已关闭：现在显示真实进度。", "Evil UX is off. Showing actual progress."));}else if(action==='generate'||action==='load-more')return run(label("准备本章任务…", "Preparing chapter tasks…"),()=>loadBatch(g,c));else if(action==='filter'){onlyCompleted=!onlyCompleted;render();}else if(action==='complete'){const t=getTask(taskId);if(!t)return;setTask(g,c,t);}else if(action==='edit-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify(label("已完成任务必须先撤销，才能编辑。", "Undo completion before editing this task."),true);openModal('edit-task',taskId);}else if(action==='delete-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify(label("已完成任务必须先撤销，才能删除。", "Undo completion before deleting this task."),true);openModal('delete-task',taskId);}else if(action==='add-task')openModal('add-task');else if(action==='confirm-delete'){c.tasks=c.tasks.filter(t=>t.id!==modal.taskId);closeModal();persist();render();notify(label("任务与对应普通成就已删除。", "Task and linked achievement deleted."));}else if(action==='regenerate')openModal('regenerate');else if(action==='confirm-regen'){return run(label("正在更新任务…", "Updating tasks…"),async()=>{await loadBatch(g,c,true);closeModal();});}else if(action==='ach-tab'){achTab=element.dataset.tab;render();}}
@@ -166,8 +262,20 @@ return run(label("DeepSeek 正在规划章节…", "DeepSeek is planning your ch
   const data=await requestQuest('goals/generate',{goal:description});
   const g=generatedGoal(description,data);s.goals.unshift(g);s.selectedGoalId=g.id;s.selectedChapterId=g.chapters[0].id;s.view='dashboard';closeModal();persist();notify(label("Quest 已创建 · ", "Quest created · ")+g.chapters.length+label(" 个章节", " chapters"));
 });}else if(event.target.id==='task-form'){event.preventDefault();const f=new FormData(event.target),title=String(f.get('title')||'').trim(),desc=String(f.get('description')||'').trim(),difficulty=String(f.get('difficulty')||'medium'),achName=String(f.get('achievement')||'').trim();if(!title||!desc||!achName||!XP[difficulty])return;if(modal.kind==='edit-task'){const t=getTask(modal.taskId);if(!t||t.completed){notify(label("已完成任务不能直接修改。", "Undo completion to edit this task."),true);return;}if(t.title!==title || t.description!==desc || t.achievement.title!==achName)delete t.locales;t.title=title;t.description=desc;t.difficulty=difficulty;t.achievement.title=achName;}else{const t=makeTask([title,desc,difficulty,achName]);chapter().tasks.push(t);chapter().generated=true;}closeModal();persist();render();notify(label("任务与对应 Achievement 已保存。", "Task and achievement saved."));}};
-function tickEvilClock(){for(const el of document.querySelectorAll('[data-patina]')){const patina=patinaLabel(Number(el.dataset.patina),Date.now()+(rustPreview?84000:0));el.textContent=patina;el.classList.toggle('tarnished',patina!==label("闪耀", "Polished"));el.title=label("演示时间每 12 秒过一天，完成任务可擦亮一枚旧徽章。", "Every 12 seconds simulates one day. Complete a task to polish an old badge.");}}
-const evilClockTimer=setInterval(tickEvilClock,1000);
+function tickEvilClock(){
+  const now=Date.now()+(rustPreview?7*DAY_MS:0);
+  for(const el of document.querySelectorAll('.ach-emoji[data-patina]')){
+    const timestamp=Number(el.dataset.patina),stage=patinaState(timestamp,now);
+    el.textContent=patinaLabel(timestamp,now);
+    el.classList.toggle('tarnished',stage==='tarnished');
+    el.classList.toggle('tarnishing',stage==='tarnishing');
+    el.title=label("12 小时开始氧化，24 小时完全氧化。可擦拭或完成新任务重新闪耀。", "Tarnishes after 12h, fully tarnishes after 24h. Rub or complete a new task to restore shine.");
+  }
+  for(const button of document.querySelectorAll('[data-action="polish"][data-patina]')){
+    button.hidden=patinaState(Number(button.dataset.patina),now)==='polished';
+  }
+}
+const evilClockTimer=setInterval(tickEvilClock,15000);
 const selectGoal=e=>{if(e.target.id==='goal-picker'&&!pending)switchGoal(e.target.value);};
 document.addEventListener('change',selectGoal);
 document.addEventListener('click',handleClick);

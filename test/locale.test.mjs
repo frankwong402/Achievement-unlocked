@@ -27,6 +27,8 @@ test('switching persists only the language and renders the saved board, badges a
     assert.match(v.dashboard(g),/保留我的自定义任务/);
     assert.match(v.settingsPage(g),/Local Storage/);
     assert.match(v.achievementsPage(g),/Secret condition/);
+    assert.match(v.achievementsPage(g),/data-action="polish"/);
+    assert.match(v.achievementsPage(g),/Polish Achievement/);
     assert.match(questSettingsDialog(g,true),/Confirm deletion/);
     const completedChapter={...c,tasks:c.tasks.map(task=>({...task,completed:true}))};
     assert.match(rewardDialog({stage:0,flowVersion:2},completedChapter,earned,true),/Stamp the certificate/);

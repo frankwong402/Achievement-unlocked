@@ -71,3 +71,21 @@
 @keyframes virtual-stamp-drop{from{opacity:.35;transform:rotate(-18deg) scale(1.36)}70%{opacity:1;transform:rotate(-8deg) scale(.94)}to{transform:rotate(-9deg) scale(1)}}
 @keyframes recalculate-to-hundred{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @media(prefers-reduced-motion:reduce){.virtual-seal.applied,.claim-gauge.recalculate-complete i{animation:none}}
+
+/* Real-time badge tarnishing and tactile hand-polish interaction. */
+.ach-emoji.tarnishing{color:#d8b56c;filter:saturate(.75)}
+.ach-emoji.tarnished{color:#ad8257;filter:saturate(.55)}
+.polish-open{margin-top:12px;border-color:#846a48!important;color:#e5c38f!important;transition:background .2s,transform .2s}
+.polish-open:hover{transform:translateY(-1px);background:#3b3027!important}
+.polish-open[hidden]{display:none!important}
+.polish-station{padding:12px 0 2px;text-align:center}
+.polish-medal{width:240px;height:240px;margin:8px auto 18px;position:relative;border-radius:50%;isolation:isolate}
+.polish-medal-core{position:absolute;inset:9px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;border:5px double #fae7ab;background:radial-gradient(circle at 38% 25%,#f8e6b2,#d49b4b 43%,#7f552c 76%,#30271a 100%);box-shadow:inset 0 0 0 8px #ffebae40,0 0 40px #f1bb5470;color:#fff6d7}
+.polish-medal-core span{font:900 92px/1 Georgia,serif;text-shadow:0 3px 12px #57370a}
+.polish-medal-core small{font-size:11px;font-weight:900;letter-spacing:.1em}
+.polish-canvas{position:absolute;inset:0;width:240px;height:240px;touch-action:none;user-select:none;cursor:crosshair}
+.polish-meter{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:295px;margin:auto}
+.polish-meter .claim-gauge{flex:1;margin:8px 0}
+.polish-meter strong{font:750 14px ui-monospace,monospace;color:#f7d69d;width:46px;text-align:right}
+.polish-tip{margin:12px auto 4px;max-width:350px;color:#aab5b5;font-size:12px;line-height:1.6}
+@media(max-width:420px){.polish-medal{margin:8px auto 15px}.modal .modal-actions{flex-wrap:wrap}}

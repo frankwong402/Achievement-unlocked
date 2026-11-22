@@ -51,8 +51,45 @@ export function chapterAudit(chapter) {
   return {total: chapter.tasks.length, hard, challenge: hard < chapter.tasks.length / 2};
 }
 
-export function patinaLabel(polishedAt, now) {
-  const age = Math.max(0, now - polishedAt);
-  if (age >= 84000) return label('已氧化', 'Tarnished');
-  return age >= 42000 ? label('氧化中', 'Tarnishing') : label('闪耀', 'Polished');
+// Badges age in real time: light tarnish at 12h, fully tarnished at 24h.
+export const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function patinaState(polishedAt, now=Date.now()) {
+  const stamp = Number(polishedAt);
+  const age = Number.isFinite(stamp) && stamp >= 0 ? Math.max(0, now-stamp) : 0;
+  return age>=DAY_MS ? 'tarnished' : age>=DAY_MS/2 ? 'tarnishing' : 'polished';
+}
+
+export function patinaLabel(polishedAt, now=Date.now()) {
+  const stage=patinaState(polishedAt, now);
+  return stage==='tarnished' ? label('已氧化', 'Tarnished')
+    : stage==='tarnishing' ? label('氧化中', 'Tarnishing')
+    : label('闪耀', 'Polished');
+}
+
+export function polishedTime(task, goal) {
+  return [task?.polishedAt, task?.completedAt, goal?.createdAt]
+    .find(value=>Number.isFinite(value) && value>0) ?? Date.now();
+}
+
+// The same badge ID, unlock and XP remain intact. Only its cosmetic clock changes.
+export function polishAchievement(goal, badgeId, now=Date.now()) {
+  if (!goal || !badgeId) return null;
+  const task=goal.chapters.flatMap(c=>c.tasks)
+    .find(t=>t.completed && t.achievement?.unlocked && t.achievement.id===badgeId);
+  if(!task) return null;
+  task.polishedAt=now;
+  return task;
+}
+
+// Completing a new task automatically refreshes the oldest other unlocked badge.
+export function autoPolishAchievement(goal, newestTask, now=Date.now()) {
+  if(!goal || !newestTask?.completed) return null;
+  const eligible=goal.chapters.flatMap(c=>c.tasks)
+    .filter(t=>t!==newestTask && t.completed && t.achievement?.unlocked)
+    .sort((a,b)=>polishedTime(a,goal)-polishedTime(b,goal));
+  if(!eligible.length) return null;
+  const task=eligible[0], statusBefore=patinaState(polishedTime(task,goal),now);
+  task.polishedAt=now;
+  return {task,statusBefore};
 }
