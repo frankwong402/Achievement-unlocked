@@ -18,6 +18,12 @@ Choose the number of chapters based on the breadth of the goal, including just o
   ];
 }
 export function chapterMessages({goal,chapter,chapterDescription,existingTasks,batch,language}) {
+  // Follow-ups ask for a different application of the skill. A manual retry
+  // can explore another angle instead of resubmitting the very same prompt.
+  const angles = ['diagnose a realistic mistake', 'compare two approaches', 'teach a newcomer',
+    'verify an outcome with evidence', 'adapt to a practical constraint'];
+  const followUp = existingTasks.length > 0;
+  const angle = followUp ? angles[Math.floor(Math.random() * angles.length)] : null;
   return [
     {role:"system",content:shared + `\nOutput schema:
 {"tasks":[{"title":"string","description":"string","difficulty":"easy|medium|hard","achievementTitle":"string","completionCriteria":"string"}],"hiddenAchievements":[{"title":"string","description":"string","condition":"string","kind":"semantic"}],"hasMore":false,"metadata":{}}
@@ -27,7 +33,13 @@ Each task unlocks exactly ONE regular achievement; difficulty must be one of eas
 On the first batch, include 1–3 chapter-wide hidden achievements; on later batches hiddenAchievements may be [].
 Never replace or rewrite already completed tasks. The backend awards XP from difficulty, not your own numeric XP.
 hasMore is true only if another batch of distinct, useful tasks is genuinely warranted.`},
-    {role:"user",content:JSON.stringify({goal,chapter,chapterDescription,existingTasks,batch,language})}
+    {role:"user",content:followUp
+      ? "Prepare a new extension pack for the chapter below. Its initial tasks already exist. "
+        + "Design practical challenges that " + angle + ". Choose a small useful batch. "
+        + "Before answering, discard any task that repeats a supplied title or activity. "
+        + "Give each new challenge an observable deliverable. Return the chapter JSON object.\n"
+        + JSON.stringify({chapter,chapterDescription,goal,forbiddenTasks:existingTasks,batch,language})
+      : JSON.stringify({goal,chapter,chapterDescription,existingTasks,batch,language})}
   ];
 }
 export function evaluationMessages({goal,tasks,achievements,language}) {
