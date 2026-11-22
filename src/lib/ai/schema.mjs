@@ -119,12 +119,14 @@ export function validateEvaluationInput(value) {
   return {
     goal:text(value.goal, "goal", 600, 3),
     tasks:list(value.tasks, "tasks", 120).map(t => ({
+      chapterId:typeof t?.chapterId==="string"?t.chapterId.slice(0,100):null,
       title:text(t?.title,"task.title",130),
       completed:t.completed === true
     })),
     achievements:list(value.achievements,"achievements",12,1).map(a => ({
       id:text(a?.id, "achievement.id", 100),
       title:text(a?.title, "achievement.title", 100),
+      chapterId:typeof a?.chapterId==="string"?a.chapterId.slice(0,100):null,
       condition:text(a?.condition, "achievement.condition", 400)
     })),
     language:value.language === "en" ? "en" : "zh"

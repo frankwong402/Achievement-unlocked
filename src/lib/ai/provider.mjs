@@ -1,8 +1,10 @@
 import {ContractError,parseModelJson} from "./schema.mjs";
 
+import {reserveCall} from "./budget.mjs";
+
 const BASE_URL = "https://aihubmix.com/v1";
 const MODEL = "deepseek-v4-flash";
-const MAX_WAIT_MS = 30000;
+const MAX_WAIT_MS = 65000;
 
 // Fail closed until the owner explicitly enables and verifies production AI.
 // This prevents a public unauthenticated endpoint spending the hackathon's $12 credit.
@@ -12,7 +14,7 @@ export function isLiveEnabled() {
 export function selectedModel() {
   return process.env.AIHUBMIX_MODEL?.trim() || MODEL;
 }
-export async function completeJson(messages, validator, maxTokens = 4000) {
+export async function completeJson(messages, validator, maxTokens = 4000, request) {
   if (!isLiveEnabled()) {
     throw new ContractError("AI_DISABLED", "Live AI is disabled until the owner enables it", 503);
   }
@@ -24,25 +26,33 @@ export async function completeJson(messages, validator, maxTokens = 4000) {
   if (!/^https:\/\/([a-z0-9-]+\.)?aihubmix\.com\/v1$/i.test(base)) {
     throw new ContractError("AI_CONFIG_ERROR", "Invalid AIHubMix base URL", 503);
   }
-  let response;
+  if (selectedModel() !== MODEL) throw new ContractError("AI_CONFIG_ERROR","Unexpected model for this budget",503);
+  await reserveCall(request, messages, maxTokens);
+  let response, payload;
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(),MAX_WAIT_MS);
   try {
     response = await fetch(base + "/chat/completions",{
       method:"POST",
+      redirect:"error",
       signal:abortController.signal,
       headers:{"Content-Type":"application/json",Authorization:"Bearer " + apiKey},
       body:JSON.stringify({
         model:selectedModel(),
         messages,
         response_format:{type:"json_object"},
+        thinking:{type:"disabled"},
         temperature:0.45,
         max_tokens:maxTokens,
         stream:false
       }),
       cache:"no-store"
     });
+    if (response.ok) {
+      try { payload = await response.json(); } catch (e) { if(e.name==="AbortError") throw e; throw new ContractError("INVALID_AI_RESPONSE","AI provider returned invalid JSON",502); }
+    }
   } catch(e) {
+    if(e instanceof ContractError) throw e;
     throw new ContractError(e?.name === "AbortError" ? "AI_TIMEOUT" : "AI_NETWORK_ERROR",
       "AI service did not respond",e?.name === "AbortError" ? 504 : 502);
   } finally {
@@ -53,9 +63,7 @@ export async function completeJson(messages, validator, maxTokens = 4000) {
     if(response.status===401||response.status===403)throw new ContractError("AI_AUTH_ERROR","AI service authorization failed",502);
     throw new ContractError("AI_UPSTREAM_ERROR","AI service request failed",502);
   }
-  let payload;
-  try { payload = await response.json(); }
-  catch {throw new ContractError("INVALID_AI_RESPONSE","AI provider returned invalid JSON",502);}
+  if (process.env.AU_BUILD_PROBE === "1") console.info("AI receipt", JSON.stringify({model:payload.model,input:payload.usage?.prompt_tokens,output:payload.usage?.completion_tokens}));
   const content = payload?.choices?.[0]?.message?.content;
   // No automatic JSON repair or retry per product decisions Q28/Q44.
   const result = parseModelJson(content);

@@ -27,3 +27,20 @@
 .evil-countdown{font-size:clamp(19px,2.3vw,30px);font-family:ui-monospace,monospace;font-weight:900;color:#ffd4b6}
 @media(max-width:740px){.evil-lab-grid{grid-template-columns:1fr;padding:18px}.evil-lab-top,.evil-lab-foot{padding:12px 16px}.evil-lab-metric{min-height:100px}.evil-lab-counter{white-space:nowrap}}
 @media(prefers-reduced-motion:reduce){.evil-lab *{animation:none!important;transition:none!important}}
+.workspace, .grid-main>*,.head-flex>div,.task-body{min-width:0}
+.content,.modal{overflow-wrap:anywhere}
+.goal-select{min-width:0;max-width:55%;border:1px solid var(--stroke);border-radius:6px;background:var(--surface);color:var(--text);padding:8px 12px}
+.topbar{gap:12px}.topbar .breadcrumbs{margin-right:auto}
+.quest-hero{border:1px solid #34473b;border-left:4px solid var(--mint);padding:clamp(22px,4vw,44px);margin-bottom:22px;border-radius:12px;background:radial-gradient(ellipse at 90% 0%,#31463290,transparent 56%),linear-gradient(125deg,#182621,#101820)}
+.quest-hero h1{font-size:clamp(30px,4vw,54px);line-height:1.12;letter-spacing:-.045em;margin:14px 0}
+.quest-hero p,.reward-strip p{color:#a7b7b5;line-height:1.6}.quest-hero button{margin-top:8px}
+.reward-strip{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 22px;border:1px solid #776345;background:linear-gradient(110deg,#302a21,#1c2026);border-radius:10px;margin:12px 0}
+.reward-strip h3,.reward-strip p{margin:5px 0}.reward-strip h3{color:#f7d29b}
+.reward-stage{background:linear-gradient(135deg,#352d28,#192329);border:1px solid #796846;border-radius:9px;padding:22px;margin:16px 0;animation:pop .26s ease}
+.reward-stage strong{display:block;color:#ffcf8c;font:800 clamp(24px,5vw,36px)/1.4 ui-monospace,monospace}
+.reward-stage.spin strong{animation:spin-reveal .5s ease-out}
+@keyframes spin-reveal{from{transform:rotateX(180deg);opacity:.25}}
+.ach-emoji[data-patina]{font-size:13px;min-width:60px;color:var(--mint);transition:color 1s}.ach-emoji.tarnished{color:#d18f5b}
+.modal{max-height:90dvh;overflow:auto}.feedback{padding:14px 16px;border:1px solid #766142;border-radius:8px;background:#2c2922;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}
+@media(max-width:740px){.goal-select{flex:1}.breadcrumbs{display:none}.task-footer,.head-flex,.reward-strip{flex-wrap:wrap}.topbar{position:static}.task-footer>div{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
