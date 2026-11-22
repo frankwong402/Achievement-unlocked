@@ -19,14 +19,27 @@ test('client and global frequency are independent',()=>{
   assert.throws(()=>reserveInLedger(state,'fresh',100),{code:'RATE_LIMIT'});
   assert.equal(reserveInLedger(state,'one',61001).used,31);
 });
-test('reward interactions leave real task records and all three XP sources intact',()=>{
-  const s=freshState(),g=s.goals[0],c=g.chapters[0],t=c.tasks[0];
-  t.completed=t.achievement.unlocked=true;g.hidden[0].unlocked=true;
-  const before=JSON.stringify(g),r=offer(s,g,c),visited=new Set(),metrics=[];
-  while(r.stage<7){visited.add(r.stage);metrics.push(rewardInfo(r,xp(g),1,3)[2]);rewardStep(r,xp(g),1000);}
-  assert.equal(visited.size,7);assert.deepEqual(metrics.slice(0,3),['99.9%','99.99%','99.999%']);
-  assert.equal(xp(g),260);assert.equal(JSON.stringify(g),before);assert.equal(r.deadline,26000);
-  t.completed=t.achievement.unlocked=g.hidden[0].unlocked=false;assert.equal(xp(g),0);
+test('chapter reward has only virtual stamp and recalculation to 100%, without changing XP',()=>{
+  const s=freshState(),g=s.goals[0],c=g.chapters[0];
+  c.tasks.forEach(task=>{task.completed=true;task.achievement.unlocked=true;});
+  g.hidden[0].unlocked=true;
+  const before=JSON.stringify(g),earned=xp(g),receipt=offer(s,g,c);
+  assert.equal(receipt.stage,0);
+  assert.match(rewardInfo(receipt)[3],/盖虚拟章|Stamp/);
+  rewardStep(receipt,earned,1000);
+  assert.equal(receipt.stage,1);
+  assert.equal(rewardInfo(receipt)[2],'99.9%');
+  assert.match(rewardInfo(receipt)[3],/Recalculate/);
+  rewardStep(receipt,earned,1000);
+  assert.equal(receipt.stage,2);
+  assert.equal(rewardInfo(receipt)[2],'100%');
+  rewardStep(receipt,earned,1000);
+  assert.equal(receipt.stage,2);
+  assert.equal(xp(g),earned);
+  assert.equal(JSON.stringify(g),before);
+  const legacy={rewardOffers:{[g.id+'/'+c.id]:{stage:7,claims:1}}};
+  assert.equal(offer(legacy,g,c).stage,2);
+  assert.equal(offer(legacy,g,c).flowVersion,2);
 });
 test('regeneration commits atomically and retains completed IDs and hidden badges',()=>{
   const g=generatedGoal('Testing goals',{title:'Testing',chapters:[{title:'Start',description:'Start here'}],hiddenAchievements:[]});
@@ -50,21 +63,30 @@ import {rewardDialog} from '../src/features/achievements/ui/reward-view.js';
 import {requestCompletion} from '../src/lib/ai/provider.mjs';
 import {validateGoalOutput} from '../src/lib/ai/schema.mjs';
 
-test('chapter audit reads real difficulty and leaves the completed chapter intact',()=>{
+test('chapter completion dialog shows only a stamp and a final 100 percent receipt',()=>{
   const state=freshState(), goal=state.goals[0], chapter=goal.chapters[0];
   const receipt=offer(state,goal,chapter);
   assert.equal(chapterAudit(chapter),null);
   chapter.tasks.forEach(task=>{task.completed=true;task.achievement.unlocked=true;});
   const before=JSON.stringify(goal);
   assert.deepEqual(chapterAudit(chapter),{total:3,hard:0,challenge:true});
-  assert.match(rewardDialog(receipt,chapter,xp(goal),true),/data-action="audit-answer"/);
-  assert.match(rewardDialog(receipt,chapter,xp(goal),false),/徽章已领取/);
-  receipt.auditPassed=true;
-  assert.match(rewardDialog(receipt,chapter,xp(goal),true),/无限进度/);
+  const stamp=rewardDialog(receipt,chapter,xp(goal),true);
+  assert.match(stamp,/virtual-seal/);
+  assert.match(stamp,/data-action="reward-step"/);
+  assert.doesNotMatch(stamp,/audit-answer|data-evil-clock|draw-slot/);
+  rewardStep(receipt);
+  const recalculation=rewardDialog(receipt,chapter,xp(goal),true);
+  assert.match(recalculation,/99\.9%/);
+  assert.match(recalculation,/Recalculate/);
+  rewardStep(receipt);
+  const complete=rewardDialog(receipt,chapter,xp(goal),true);
+  assert.match(complete,/100%/);
+  assert.match(complete,/recalculate-complete/);
+  assert.doesNotMatch(complete,/data-action="reward-step"/);
+  assert.match(rewardDialog(receipt,chapter,xp(goal),false),/100%/);
   assert.equal(JSON.stringify(goal),before);
   assert.deepEqual([0,42000,84000].map(time=>patinaLabel(0,time)),['闪耀','氧化中','已氧化']);
 });
-
 test('provider returns typed errors for timeout, authorization and invalid model JSON',async()=>{
   const config={base:'https://example.test',messages:[],maxTokens:100};
   const scenarios=[
