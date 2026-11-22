@@ -77,3 +77,13 @@ test('provider returns typed errors for timeout, authorization and invalid model
   for(const [fetcher,code,status] of scenarios)
     await assert.rejects(requestCompletion(config,validateGoalOutput,fetcher),{code,status});
 });
+
+import {hiddenHint} from '../src/features/achievements/lib/game-model.js';
+
+test('older public hints keep their flavor without displaying unlock instructions',()=>{
+  const h={title:'初识手冲', condition:'本章完成一项任务', description:'完成本章第一个任务。'};
+  assert.doesNotMatch(hiddenHint(h),/完成|任务/);
+  h.description='咖啡香钻出了杯沿。';
+  assert.equal(hiddenHint(h), h.description);
+  assert.equal(h.condition,'本章完成一项任务');
+});

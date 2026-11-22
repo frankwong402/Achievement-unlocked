@@ -16,3 +16,15 @@ export function hiddenList(g){return [...g.hidden,...g.chapters.flatMap(c=>c.hid
 export function makeTask(row){return{id:id(),title:row[0],description:row[1],difficulty:row[2],completed:false,achievement:{id:id(),title:row[3]||('Achievement: '+row[0]),unlocked:false},metadata:{source:'mock-ai'}}}
 export function templateFor(g,c){let group=TASKS[g.type]||TASKS.general;if(!group[c.index])group=TASKS.general;return group[c.index]||TASKS.general[0];}
 
+
+// Older generated saves can contain the unlock instructions in the public hint.
+export function hiddenHint(badge) {
+  const hint = String(badge.description || '').trim();
+  const rule = String(badge.condition || '').trim();
+  if (!rule) return hint;
+  const explicit = /完成|解锁|累计|连续|至少|全部|第[一二三四五六七八九十\d]+|[0-9]|\b(?:complete[d]?|finish(?:ed)?|unlock|at least|tasks?|first|every|three|twice)\b/i;
+  if (hint && !hint.includes(rule) && !explicit.test(hint)) return hint;
+  return /[\u3400-\u9fff]/.test(hint + badge.title)
+    ? '这枚徽章记录着旅途中的一个秘密。'
+    : 'A quiet discovery along the way.';
+}

@@ -6,7 +6,7 @@ Return exactly one valid JSON object with no Markdown, comments, code fences or 
 Tasks must be achievable, observable and specific; do not fabricate user progress.
 Keep a flexible chapter/task count based on scope, while respecting output limits.
 Generate creative Steam-style achievement names and meaningful conditions.
-Hidden conditions must be verifiable from completed task titles and counts. Include one early discovery for completing the first task in scope. Their unlock conditions are not shown in the UI.
+Hidden conditions must be verifiable from completed task titles and counts. Include one early discovery for completing the first task in scope. The public title and description are atmospheric clues. Never state the qualifying action, count, task title or threshold in those fields. Put that information only in condition.
 Do not include unsafe or deceptive real-world requirements such as making purchases or inviting friends.
 Keep titles and descriptions short. All output strings should match the requested language.`;
 export function goalMessages({goal,language}) {
