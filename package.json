@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "npm run test && next build",
     "start": "next start",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "prebuild": "node scripts/build-client.mjs",
+    "predev": "node scripts/build-client.mjs"
   },
   "dependencies": {
     "@vercel/blob": "2.9.0",
@@ -14,5 +16,8 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
 }

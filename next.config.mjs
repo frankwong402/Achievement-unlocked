@@ -1,5 +1,4 @@
-// The profile already proxies /achievement/api/* to this project's /api/*.
-// Route the public Next chunks through that same origin on both entry points.
+// The profile forwards this exact static namespace to the standalone deployment.
 const assetPrefix = '/achievement/api/assets';
 
 export default {
