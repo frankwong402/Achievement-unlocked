@@ -120,7 +120,7 @@ if(action==='translate-task'){
   const t=getTask(taskId);
   if(!t || taskCopies(g,t))return;
   return run(label('正在补全任务的中英双语…','Preparing bilingual task text…'),async()=>{
-    const locales=await requestQuest('tasks/translate',{task:originalText(t)});
+    const locales=await requestQuest('chapters/generate',{operation:'translate-task',task:originalText(t)});
     const nextTask={...t,locales};
     const chapters=g.chapters.map(ch=>ch.id===c.id?{...ch,tasks:ch.tasks.map(task=>task.id===t.id?nextTask:task)}:ch);
     persist({...s,goals:s.goals.map(item=>item.id===g.id?{...item,chapters}:item)});

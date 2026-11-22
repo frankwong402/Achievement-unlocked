@@ -56,3 +56,18 @@ test('every bundled IELTS task and its badge have both languages without an API 
     assert.ok(copies.zh.achievementTitle!==copies.en.achievementTitle);
   }
 });
+
+test('the public chapter endpoint dispatches translation requests through the same budgeted provider',async()=>{
+  const {POST}=await import('../src/app/api/chapters/generate/route.js');
+  const previous=process.env.AI_LIVE_ENABLED;
+  process.env.AI_LIVE_ENABLED='false';
+  try {
+    const response=await POST(new Request('https://example.test/achievement/api/chapters/generate',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({operation:'translate-task',task:zh})
+    }));
+    assert.equal((await response.json()).error.code,'AI_DISABLED');
+  } finally {
+    if(previous===undefined)delete process.env.AI_LIVE_ENABLED;
+    else process.env.AI_LIVE_ENABLED=previous;
+  }
+});
