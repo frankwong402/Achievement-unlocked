@@ -32,7 +32,8 @@
 .goal-select{min-width:0;max-width:55%;border:1px solid var(--stroke);border-radius:6px;background:var(--surface);color:var(--text);padding:8px 12px}
 .topbar{gap:12px}.topbar .breadcrumbs{margin-right:auto}
 .quest-hero{border:1px solid #34473b;border-left:4px solid var(--mint);padding:clamp(22px,4vw,44px);margin-bottom:22px;border-radius:12px;background:radial-gradient(ellipse at 90% 0%,#31463290,transparent 56%),linear-gradient(125deg,#182621,#101820)}
-.quest-hero h1{font-size:clamp(30px,4vw,54px);line-height:1.12;letter-spacing:-.045em;margin:14px 0}
+.home-title{margin:0 0 clamp(20px,3vw,32px)}
+.quest-hero h2{font-size:clamp(23px,3vw,36px);line-height:1.12;letter-spacing:-.045em;margin:14px 0}
 .quest-hero p,.reward-strip p{color:#a7b7b5;line-height:1.6}.quest-hero button{margin-top:8px}
 .reward-strip{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 22px;border:1px solid #776345;background:linear-gradient(110deg,#302a21,#1c2026);border-radius:10px;margin:12px 0}
 .reward-strip h3,.reward-strip p{margin:5px 0}.reward-strip h3{color:#f7d29b}

@@ -92,7 +92,7 @@ function render() {
   const g=goal(),c=chapter();
   const root=document.getElementById('app');
   if(!root||!alive)return;
-  root.innerHTML=`<div class="shell">${sidebar(g)}<div class="workspace">${header(g)}<div class="content"><div id="request-feedback"></div>${s.storageReadOnly?'<p role="alert">原有存档无法读取。此会话为只读，原始存档已保留。</p>':''}${c?.evaluationPending&&!pending&&!failure?'<button class="btn ghost" data-action="check-secrets">隐藏成就待判定 · Retry</button>':''}${s.view==='settings'?settingsPage(g):!g?'<section class="quest-hero"><h1>还没有 Quest</h1><button class="btn primary" data-action="new-goal">创建 Quest</button></section>':s.view==='achievements'?achievementsPage(g):dashboard(g)}</div></div></div><div id="modal-root"></div>`;
+  root.innerHTML=`<div class="shell">${sidebar(g)}<div class="workspace">${header(g)}<div class="content"><div id="request-feedback"></div>${s.storageReadOnly?'<p role="alert">原有存档无法读取。此会话为只读，原始存档已保留。</p>':''}${c?.evaluationPending&&!pending&&!failure?'<button class="btn ghost" data-action="check-secrets">隐藏成就待判定 · Retry</button>':''}${s.view==='settings'?settingsPage(g):g&&s.view==='achievements'?achievementsPage(g):dashboard(g)}</div></div></div><div id="modal-root"></div>`;
   if(!document.getElementById('toast-container')){const n=document.createElement('div');n.id='toast-container';n.setAttribute('role','status');document.body.append(n);}
   if(modal)renderModal();
   feedback();tickEvilClock();
