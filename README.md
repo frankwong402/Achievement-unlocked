@@ -1,78 +1,20 @@
 # Achievement Unlocked
 
-Hackathon Track 2 — a Steam-like quest tracker with satirical Evil UX. Built with **Next.js App Router**.
+输入一个目标，生成章节和任务，收集普通与隐藏徽章。完成任务后可以进入讽刺性的领奖流程。在 Settings 中关闭 Evil UX 即可使用普通奖励反馈。
 
-## Project structure
+- 正式入口 https://www.frankwong.dev/achievement
+- 独立入口 https://achievement-unlocked-franky15.vercel.app
 
-```text
-src/
-  app/
-    page.jsx                            # App UI entry
-    globals.css                         # Visual theme
-    api/
-      goals/generate/route.js           # POST generate goal/chapters
-      chapters/generate/route.js        # POST generate chapter tasks
-      achievements/evaluate/route.js    # POST semantic hidden judgment
-      ai/status/route.js                # GET safe status
-  features/achievements/
-    components/                         # Client UI
-    ui/                                 # Visual templates
-    lib/                                # Game state, XP, persistence
-    data/                               # Offline Mock tasks
-    lib/evil-engine.mjs                 # Satirical Evil UX sequences
-  lib/ai/
-    provider.mjs                        # DeepSeek via AIHubMix
-    prompts.mjs                         # B teammate's prompt ownership
-    schema.mjs                          # Stable JSON contract + validators
-    http.mjs                            # Errors / input / lightweight throttling
-docs/
-  API_CONTRACT.md                       # API requests, responses, status codes
-test/
-  ai-contract.test.mjs                  # Contract and safe-mode tests
-```
+## 开发
 
-The root HTML file is gone: Next.js serves the UI through `src/app/page.jsx`. D teammate owns UI; A teammate owns the `app/api` and `lib/ai` boundaries.
+使用 Node 22，运行 `npm install`、`npm test`、`npm run dev`。生产构建 `npm run build` 会先运行测试。
 
-## Quick start
+## AI 与存档
 
-```sh
-npm install
-npm test
-npm run dev
-```
+三个 Next.js Route Handler 调用 AIHubMix 的 `deepseek-v4-flash`。目标和章节按需生成，每次完成或撤销任务后重新判定隐藏徽章。界面单独标记示例 Quest。模型、网络或配额错误由用户选择 Retry。
 
-The production build (`npm run build`) runs tests before `next build`.
+生产环境使用 `AIHUBMIX_API_KEY`、`AIHUBMIX_BASE_URL`、`AIHUBMIX_MODEL`、`AI_LIVE_ENABLED` 以及私有 Vercel Blob 的 `BLOB_READ_WRITE_TOKEN`。模型调用之前必须成功预占持久化额度，同一活动最多 300 次，全局每分钟 30 次、每个客户端每分钟 8 次。失败的上游请求也占用次数。正式域名使用同源 `/achievement/api/*`，独立部署使用 `/api/*`。
 
-## AI setup
+游戏记录保存在当前浏览器、当前域名下原有的 LocalStorage 键。普通与隐藏成就从当前记录计算 XP。终章加试、模拟助力、碎片抽取和徽章快进预览只读取任务记录。
 
-Copy variable **names** from `.env.example` into Vercel Production, without exposing real secrets in code:
-
-- `AIHUBMIX_API_KEY` — stored only as a sensitive Vercel environment variable
-- `AIHUBMIX_BASE_URL=https://aihubmix.com/v1`
-- `AIHUBMIX_MODEL=deepseek-v4-flash` (optional: provider also defaults to this ID)
-- `AI_LIVE_ENABLED=true` — **do not enable until** rate limiting, $12 credit controls and end-to-end testing are ready
-
-AI endpoints are present but **disabled by default** to prevent spending real credit unintentionally. `GET /api/ai/status` works without a billed request.
-
-## Current frontend limitations
-
-The frontend still displays clearly labeled Mock data and saves locally under the existing LocalStorage key, including progress and Evil UX toggle settings. **It is not yet connected to the new live API routes.** See `docs/API_CONTRACT.md` for D's integration contract.
-
-`https://www.frankwong.dev/achievement` is reverse-proxied from the profile project. The reverse proxy currently handles the homepage, **not** `/achievement/api/*`. Configure the API path proxy or a permitted API origin before live front-end integration. The Next.js `assetPrefix` remains configured for the standalone project.
-
-## Team responsibilities
-
-- **A (technical lead):** server API, AI provider, schemas, XP rules, deployment.
-- **B:** update prompts in `src/lib/ai/prompts.mjs`, keep JSON fields consistent.
-- **C:** test cases, achievement behavior, UX acceptance.
-- **D:** UI templates/components and API consumption, preserve LocalStorage progress.
-
-## Security
-
-Don't commit actual keys. The in-process rate limiter is best-effort only, not a distributed abuse-control solution. Protect real paid endpoints with appropriate Vercel Firewall/rate limits before enabling them.
-
-## Evil UX Lab (Track 2)
-
-The Quest Board includes a **separate, interactive seven-stage Evil UX Lab**: infinite 99.9% progress, surprise conditions, moving XP thresholds, near-complete lucky draws, simulated friend referrals, apparent progress rollback and simulated urgency countdown. The lab is always labeled **satirical/demo**; it does not send invites, erase progress, reduce earned XP, or claim real prizes. Only the demo stage and the progress bar presentation are affected. It is enabled by default and can be disabled from Settings. The existing task cards and quest flow are not redesigned.
-
-The reference WorkBuddy share page could not be opened from this environment; the implementation follows the Evil UX concepts agreed in the project conversation, rather than claiming a pixel-perfect copy.
+[API 合约](docs/API_CONTRACT.md)

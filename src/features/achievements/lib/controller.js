@@ -1,9 +1,10 @@
 import {XP} from '../data/mock-content.js';
 import {esc} from './utils.js';
 import { makeHidden, xp, getAllTasks, chapterProgress, realProgress, hiddenList, makeTask, templateFor} from './game-model.js';
-import {offer,rewardStep,rewardInfo} from './reward.mjs';
+import {offer,rewardStep,patinaLabel} from './reward.mjs';
 import {requestQuest,isLiveGoal,generatedGoal,mergeChapter,evaluateGoal} from './quest-api.js';
 import {loadState, saveState} from './storage.js';
+import {rewardDialog} from '../ui/reward-view.js';
 import {createViews} from '../ui/views.js';
 
 export function mountAchievementApp() {
@@ -19,6 +20,7 @@ function shownProgress(value) {
   if (r.stage===5) return Math.round(value*.76);
   return value===100 && r.stage!==7 ? '99.'+'9'.repeat(1+Math.min(r.presses,3)) : value;
 }
+let rustPreview=false;
 let pending='', failure=null, retry=null, alive=true;
 function feedback() {
   const root=document.querySelector('.modal-feedback')||document.querySelector('#request-feedback');
@@ -44,12 +46,14 @@ async function checkSecrets(g,c) {
   const previous=xp(g);
   const titles=await evaluateGoal(g,c);
   c.evaluationPending=false;persist();
+  if(!titles.length && xp(g)<previous)notify('隐藏徽章已重新锁定 · '+(xp(g)-previous)+' XP');
   if(titles.length)notify('隐藏成就 · '+titles.join(' / ')+' · +'+(xp(g)-previous)+' XP');
 }
 function setTask(g,c,t) {
   const previous=xp(g);
   t.completed=!t.completed;t.achievement.unlocked=t.completed;
   if(t.completed){
+    offer(s,g,c).normalClaimed=false;
     t.completedAt=Date.now();t.polishedAt=t.completedAt;
     const oldest=getAllTasks(g).filter(other=>other!==t&&other.completed).sort((a,b)=>(a.polishedAt||0)-(b.polishedAt||0))[0];
     if(oldest&&s.evilMode)oldest.polishedAt=t.completedAt;
@@ -71,12 +75,13 @@ function generateTasks(g,c,regenerate=false){const template=templateFor(g,c);if(
  c.generated=true;c.batches++;if(!c.hidden.length)c.hidden.push({...makeHidden('chapter',c.id),title:c.index===0?'First Secret':'Quiet Persistence'});mockEvaluateHidden(g);persist();return added;}
 function switchChapter(chapterId){s.selectedChapterId=chapterId;s.view='dashboard';persist();render();const g=goal(),c=chapter();if(isLiveGoal(g)&&!c.generated)run('准备本章任务…',()=>loadBatch(g,c));}
 function switchGoal(goalId){s.selectedGoalId=goalId;s.selectedChapterId=goal().chapters[0].id;s.view='dashboard';persist();render();}
-function setView(view){s.view=view;persist();render();}
+function setView(view){rustPreview=false;s.view=view;persist();render();}
 function notify(message,isWarn=false){const n=document.getElementById('toast-container');if(!n)return;clearTimeout(toastTimer);n.innerHTML='<div class="toast '+(isWarn?'warn':'')+'"><strong>'+(isWarn?'NOTICE':'ACHIEVEMENT UNLOCKED')+'</strong>'+esc(message)+'</div>';toastTimer=setTimeout(()=>n.innerHTML='',3600);}
 
 const {sidebar,header,dashboard,achievementsPage,settingsPage} = createViews({
   s, chapter, shownProgress,
   getOnlyCompleted:()=>onlyCompleted,
+  getRustPreview:()=>rustPreview,
   getAchievementTab:()=>achTab
 });
 function render() {
@@ -87,7 +92,7 @@ function render() {
   if(!document.getElementById('toast-container')){const n=document.createElement('div');n.id='toast-container';n.setAttribute('role','status');document.body.append(n);}
   if(modal)renderModal();
   feedback();tickEvilClock();
-  root.querySelectorAll('button,select').forEach(el=>{if(pending)el.disabled=true;});
+  root.querySelectorAll('button,select,textarea,input').forEach(el=>{if(pending)el.disabled=true;});
 }
 function openModal(kind,taskId){failure=null;retry=null;modal={kind,taskId};renderModal();}
 function closeModal(){modal=null;failure=null;retry=null;document.getElementById('modal-root').innerHTML='';feedback();}
@@ -96,19 +101,22 @@ else if(modal.kind==='edit-task'||modal.kind==='add-task'){const t=c.tasks.find(
 else if(modal.kind==='delete-task'){const t=c.tasks.find(t=>t.id===modal.taskId);body=`<div class="card-label">CONFIRM ACTION</div><h2>删除任务？</h2><p>删除「${esc(t?.title)}」也会删除其对应的普通成就。此操作不能撤销。</p><div class="modal-actions"><button class="btn ghost" data-action="close-modal">取消</button><button class="btn danger" data-action="confirm-delete">删除任务</button></div>`;}
 else if(modal.kind==='regenerate'){body=`<div class="card-label">REGENERATE TASKS</div><h2>重新生成本章？</h2><p>保留所有已完成任务及普通成就，只替换未完成的任务。生成成功后才替换。</p><div class="modal-actions"><button class="btn ghost" data-action="close-modal">取消</button><button class="btn warning" data-action="confirm-regen">重新生成</button></div>`;}
 else if(modal.kind==='reward'){
-  const r=offer(s,g,c),done=c.tasks.filter(t=>t.completed).length;
-  const [name,title,metric,action]=rewardInfo(r,xp(g),done,c.tasks.length);
-  const finished=!s.evilMode||r.stage===7;
-  body=`<div class="card-label">${finished?'REWARD RECEIPT':'DARK PATTERN · 讽刺演示'}</div><h2>${finished?'徽章已领取':name}</h2><div class="reward-stage ${r.stage===3?'spin':''}"><strong ${s.evilMode&&r.stage===6?'data-evil-clock data-deadline="'+Number(r.deadline)+'"':''}>${finished?xp(g)+' XP':esc(metric)}</strong><p>${finished?esc(c.title):esc(title)}</p></div><p>已记录 ${done} 项任务 · 真实余额 ${xp(g)} XP</p><div class="modal-actions"><button class="btn ghost" data-action="close-modal">回到任务</button>${finished?(s.evilMode?'<button class="btn primary" data-action="replay-reward">重玩领奖</button>':''):'<button class="btn warning" data-action="reward-step">'+action+'</button>'}</div>`;
+  body=rewardDialog(offer(s,g,c),c,xp(g),s.evilMode);
 }
 root.innerHTML=`<div class="modal-bg" id="modal-overlay"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(modal.kind)}">${body}<div class="modal-feedback"></div></div></div>`;setTimeout(()=>root.querySelector('input,textarea')?.focus(),30);}
 function getTask(idValue){return chapter().tasks.find(t=>t.id===idValue)}
 function act(element){const action=element.dataset.action,taskId=element.dataset.id,g=goal(),c=chapter();if(pending)return;
-if(action==='retry')return retry?.();
+if(action==='retry'){if(modal?.kind==='new-goal')return document.getElementById('goal-form').requestSubmit();return retry?.();}
 if(action==='check-secrets')return run('判定隐藏成就…',()=>checkSecrets(g,c));
-if(action==='claim')return openModal('reward');
+if(action==='claim'){if(!s.evilMode){offer(s,g,c).normalClaimed=true;persist();}return openModal('reward');}
+if(action==='audit-answer'){
+  if(element.dataset.choice==='threshold'){offer(s,g,c).auditPassed=true;persist();render();}
+  else notify('任务完成记录已封存。再看看领奖门槛。',true);
+  return;
+}
+if(action==='preview-rust'){rustPreview=!rustPreview;render();return;}
 if(action==='reward-step'){rewardStep(offer(s,g,c),xp(g));persist();render();return;}
-if(action==='replay-reward'){Object.assign(offer(s,g,c),{stage:0,presses:0,spin:0,boosts:0});persist();render();return;}
+if(action==='replay-reward'){Object.assign(offer(s,g,c),{stage:0,presses:0,spin:0,boosts:0,auditPassed:false});persist();render();return;}
 if(action==='view')setView(element.dataset.view);else if(action==='chapter')switchChapter(taskId);else if(action==='goal')switchGoal(taskId);else if(action==='new-goal')openModal('new-goal');else if(action==='close-modal')closeModal();else if(action==='evil'){s.evilMode=!s.evilMode;persist();render();notify(s.evilMode?'Evil UX 已开启：七种讽刺性交互效果上线。':'Evil UX 已关闭：现在显示真实进度。');}else if(action==='generate'||action==='load-more')return run('准备本章任务…',()=>loadBatch(g,c));else if(action==='filter'){onlyCompleted=!onlyCompleted;render();}else if(action==='complete'){const t=getTask(taskId);if(!t)return;setTask(g,c,t);}else if(action==='edit-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify('已完成任务必须先撤销，才能编辑。',true);openModal('edit-task',taskId);}else if(action==='delete-task'){const t=getTask(taskId);if(!t)return;if(t.completed)return notify('已完成任务必须先撤销，才能删除。',true);openModal('delete-task',taskId);}else if(action==='add-task')openModal('add-task');else if(action==='confirm-delete'){c.tasks=c.tasks.filter(t=>t.id!==modal.taskId);closeModal();persist();render();notify('任务与对应普通成就已删除。');}else if(action==='regenerate')openModal('regenerate');else if(action==='confirm-regen'){return run('正在更新任务…',async()=>{await loadBatch(g,c,true);closeModal();});}else if(action==='ach-tab'){achTab=element.dataset.tab;render();}}
 
 const handleClick=event=>{const target=event.target.closest('[data-action]');if(target){act(target);return;}if(!pending&&event.target.id==='modal-overlay')closeModal();};
@@ -118,7 +126,7 @@ return run('DeepSeek 正在规划章节…',async()=>{
   const data=await requestQuest('goals/generate',{goal:description,language:/[\u3400-\u9fff]/.test(description)?'zh':'en'});
   const g=generatedGoal(description,data);s.goals.unshift(g);s.selectedGoalId=g.id;s.selectedChapterId=g.chapters[0].id;s.view='dashboard';closeModal();persist();notify('Quest 已创建 · '+g.chapters.length+' 个章节');
 });}else if(event.target.id==='task-form'){event.preventDefault();const f=new FormData(event.target),title=String(f.get('title')||'').trim(),desc=String(f.get('description')||'').trim(),difficulty=String(f.get('difficulty')||'medium'),achName=String(f.get('achievement')||'').trim();if(!title||!desc||!achName||!XP[difficulty])return;if(modal.kind==='edit-task'){const t=getTask(modal.taskId);if(!t||t.completed){notify('已完成任务不能直接修改。',true);return;}t.title=title;t.description=desc;t.difficulty=difficulty;t.achievement.title=achName;}else{const t=makeTask([title,desc,difficulty,achName]);chapter().tasks.push(t);chapter().generated=true;}closeModal();persist();render();notify('任务与对应 Achievement 已保存。');}};
-function tickEvilClock(){for(const el of document.querySelectorAll('[data-patina]')){const age=Date.now()-Number(el.dataset.patina);el.textContent=age>=84000?'◈ 已氧化':age>=42000?'◈ 氧化中':'✦ 闪耀';el.classList.toggle('tarnished',age>=42000);el.title='演示时间每 12 秒过一天，完成任务可擦亮一枚旧徽章。';}const el=document.querySelector('[data-evil-clock]');if(!el)return;const seconds=Math.max(0,Math.ceil((Number(el.dataset.deadline)-Date.now())/1000));el.textContent=seconds?'00:'+String(seconds).padStart(2,'0'):'已过期 · 仍可领取';}
+function tickEvilClock(){for(const el of document.querySelectorAll('[data-patina]')){const label=patinaLabel(Number(el.dataset.patina),Date.now()+(rustPreview?84000:0));el.textContent=label;el.classList.toggle('tarnished',label!=='闪耀');el.title='演示时间每 12 秒过一天，完成任务可擦亮一枚旧徽章。';}const el=document.querySelector('[data-evil-clock]');if(!el)return;const seconds=Math.max(0,Math.ceil((Number(el.dataset.deadline)-Date.now())/1000));el.textContent=seconds?'00:'+String(seconds).padStart(2,'0'):'已过期 · 仍可领取';}
 const evilClockTimer=setInterval(tickEvilClock,1000);
 const selectGoal=e=>{if(e.target.id==='goal-picker'&&!pending)switchGoal(e.target.value);};
 document.addEventListener('change',selectGoal);

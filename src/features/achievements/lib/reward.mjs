@@ -29,3 +29,16 @@ export function rewardInfo(r, earned, done, total) {
   ];
   return scenes[r.stage] || scenes[0];
 }
+
+// The audit reads the finished chapter and stores its verdict only on the receipt.
+export function chapterAudit(chapter) {
+  if (!chapter.tasks.length || chapter.tasks.some(task => !task.completed)) return null;
+  const hard = chapter.tasks.filter(task => task.difficulty === 'hard').length;
+  return {total: chapter.tasks.length, hard, challenge: hard < chapter.tasks.length / 2};
+}
+
+export function patinaLabel(polishedAt, now) {
+  const age = Math.max(0, now - polishedAt);
+  if (age >= 84000) return '已氧化';
+  return age >= 42000 ? '氧化中' : '闪耀';
+}

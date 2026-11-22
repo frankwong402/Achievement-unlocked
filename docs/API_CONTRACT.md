@@ -1,9 +1,6 @@
 # Achievement Unlocked — API Contract v0.1
 
-Status: Backend routes added. **The frontend still uses Mock content.**
-Live AI calls are **disabled by default**; no API key is shipped to the browser.
-
-Base route on standalone Vercel project: `/api`. The personal-domain `/achievement` reverse proxy currently forwards only the homepage, NOT API paths. Before wiring the UI on the personal domain, configure a safe API proxy (or use a deliberately configured cross-origin endpoint).
+The web client calls the three endpoints below. The standalone base is `/api`. The profile path proxies `/achievement/api/*` to the same handlers.
 
 ## Endpoint 1 — Goal outline
 `POST /api/goals/generate`
@@ -53,11 +50,4 @@ IDs are supplied by the client and validated against the candidate list. The mod
 
 Usual status codes: 400 invalid input, 413 oversized input, 415 content type, 422 invalid schema/input, 429 throttled, 502 upstream or schema failure, 503 AI disabled/not configured, 504 timeout. **No automatic JSON repair or fallback to Mock.**
 
-## Activation checklist
-1. Confirm `AIHUBMIX_API_KEY` and `AIHUBMIX_BASE_URL` in Vercel **Production**.
-2. Set `AIHUBMIX_MODEL=deepseek-v4-flash` in Production when 2FA is available. (Provider defaults to this ID already.)
-3. Add `AI_LIVE_ENABLED=true` **only after** setting spending controls and production rate limiting (Vercel Firewall/WAF). Avoid public abuse of the $12 credit.
-4. Redeploy production to load newly configured variables, then test one request to each endpoint and confirm structured JSON.
-5. Implement UI integration and `/achievement/api/*` proxy or equivalent route. Do not claim the public UX is connected until verified.
-
-**Security note:** The in-memory per-instance limiter in `http.mjs` is best-effort only; it is NOT a substitute for distributed/proxy rate limiting. Hidden achievement conditions are sent to the browser as data and are therefore not secret from a technical user while storage is browser-only.
+Production reservations use a private Vercel Blob ledger shared by all function instances. See README for limits. Hidden conditions are omitted from the UI and stored locally for evaluation.

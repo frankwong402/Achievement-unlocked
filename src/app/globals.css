@@ -44,3 +44,13 @@
 .modal{max-height:90dvh;overflow:auto}.feedback{padding:14px 16px;border:1px solid #766142;border-radius:8px;background:#2c2922;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}
 @media(max-width:740px){.goal-select{flex:1}.breadcrumbs{display:none}.task-footer,.head-flex,.reward-strip{flex-wrap:wrap}.topbar{position:static}.task-footer>div{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+.claim-gauge{height:8px;border-radius:4px;background:#0d151b;overflow:hidden;margin:14px 0}
+.claim-gauge i{display:block;background:linear-gradient(90deg,#eda75b,#dafa9a);height:100%;animation:claim-fill .55s ease-out;transform-origin:left}
+.shards{color:#ffcf8c;font-size:24px;letter-spacing:.15em;margin:10px 0}
+.draw-slot{border:1px solid #92744c;border-radius:9px;background:#382d23;color:#ffda9e;min-width:62px;padding:8px;font-size:21px;cursor:pointer}
+.draw-slot small{display:block;font-size:11px}.draw-slot:hover,.draw-slot:focus-visible{background:#54422d}
+.seg-btn[aria-pressed=true]{border-color:#bd9465;color:#ffd29b}
+.task.done .task-check{animation:claim-check .3s ease-out}
+@keyframes claim-fill{from{transform:scaleX(.3)}}
+@keyframes claim-check{from{transform:scale(.8)}}

@@ -12,7 +12,7 @@ export function loadState() {
     if (!state || ![1,2].includes(state.version) || !Array.isArray(state.goals) || !state.goals.length) throw Error('Invalid state');
     if (state.version === 1) {
       state.version = 2;
-      state.evilMode = true;
+      if (typeof state.evilMode !== 'boolean') state.evilMode = true;
     }
     if (typeof state.evilMode !== 'boolean') state.evilMode = true;
     if (!['dashboard','achievements','settings'].includes(state.view)) state.view = 'dashboard';

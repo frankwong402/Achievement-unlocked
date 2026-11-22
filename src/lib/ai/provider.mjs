@@ -28,11 +28,15 @@ export async function completeJson(messages, validator, maxTokens = 4000, reques
   }
   if (selectedModel() !== MODEL) throw new ContractError("AI_CONFIG_ERROR","Unexpected model for this budget",503);
   await reserveCall(request, messages, maxTokens);
+  return requestCompletion({base, apiKey, messages, maxTokens}, validator);
+}
+
+export async function requestCompletion({base, apiKey, messages, maxTokens}, validator, fetcher = fetch) {
   let response, payload;
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(),MAX_WAIT_MS);
   try {
-    response = await fetch(base + "/chat/completions",{
+    response = await fetcher(base + "/chat/completions",{
       method:"POST",
       redirect:"error",
       signal:abortController.signal,

@@ -44,3 +44,36 @@ test('legacy settings and progress survive, unreadable data remains intact',()=>
   state.goals[0].chapters[0].tasks[0].completed=true;saveState(state);assert.equal(xp(loadState().goals[0]),100);
   raw='{';const recovering=loadState();assert.throws(()=>saveState(recovering));assert.equal(raw,'{');delete global.window;
 });
+
+import {chapterAudit, patinaLabel} from '../src/features/achievements/lib/reward.mjs';
+import {rewardDialog} from '../src/features/achievements/ui/reward-view.js';
+import {requestCompletion} from '../src/lib/ai/provider.mjs';
+import {validateGoalOutput} from '../src/lib/ai/schema.mjs';
+
+test('chapter audit reads real difficulty and leaves the completed chapter intact',()=>{
+  const state=freshState(), goal=state.goals[0], chapter=goal.chapters[0];
+  const receipt=offer(state,goal,chapter);
+  assert.equal(chapterAudit(chapter),null);
+  chapter.tasks.forEach(task=>{task.completed=true;task.achievement.unlocked=true;});
+  const before=JSON.stringify(goal);
+  assert.deepEqual(chapterAudit(chapter),{total:3,hard:0,challenge:true});
+  assert.match(rewardDialog(receipt,chapter,xp(goal),true),/data-action="audit-answer"/);
+  assert.match(rewardDialog(receipt,chapter,xp(goal),false),/徽章已领取/);
+  receipt.auditPassed=true;
+  assert.match(rewardDialog(receipt,chapter,xp(goal),true),/Infinite Progress/);
+  assert.equal(JSON.stringify(goal),before);
+  assert.deepEqual([0,42000,84000].map(time=>patinaLabel(0,time)),['闪耀','氧化中','已氧化']);
+});
+
+test('provider returns typed errors for timeout, authorization and invalid model JSON',async()=>{
+  const config={base:'https://example.test',messages:[],maxTokens:100};
+  const scenarios=[
+    [()=>{throw new DOMException('Timed out','AbortError');},'AI_TIMEOUT',504],
+    [()=>new Response('',{status:403}),'AI_AUTH_ERROR',502],
+    [()=>Response.json({choices:[{message:{content:'oops'}}]}),'INVALID_AI_RESPONSE',502],
+    [()=>Response.json({choices:[{message:{content:'{}'}}]}),'INVALID_AI_RESPONSE',502],
+    [()=>new Response('bad envelope'),'INVALID_AI_RESPONSE',502],
+  ];
+  for(const [fetcher,code,status] of scenarios)
+    await assert.rejects(requestCompletion(config,validateGoalOutput,fetcher),{code,status});
+});
