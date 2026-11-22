@@ -5,14 +5,18 @@ import {offer,rewardStep,patinaLabel} from './reward.mjs';
 import {requestQuest,isLiveGoal,generatedGoal,mergeChapter,evaluateGoal} from './quest-api.js';
 import {loadState, saveState} from './storage.js';
 import {rewardDialog} from '../ui/reward-view.js';
-import {createViews} from '../ui/views.js';
+import {renameQuest,deleteQuest} from './quest-settings.js';
+import {createViews,questSettingsDialog} from '../ui/views.js';
 
 export function mountAchievementApp() {
   const s = loadState();
 let modal=null,toastTimer=null,onlyCompleted=false,achTab='all';
-function persist(){try{saveState(s);}catch(e){notify('本地存储不可用，请检查浏览器设置。',true);}}
+function persist(next=s){
+  try {saveState(s,next); Object.assign(s,next); return true;}
+  catch(error){notify(error?.message || '本地存储不可用。',true);return false;}
+}
 function goal(){return s.goals.find(g=>g.id===s.selectedGoalId)||s.goals[0];}
-function chapter(){const g=goal();return g.chapters.find(c=>c.id===s.selectedChapterId)||g.chapters[0];}
+function chapter(){const g=goal();return g?.chapters.find(c=>c.id===s.selectedChapterId)||g?.chapters[0];}
 
 function shownProgress(value) {
   if (!s.evilMode || !value) return value;
@@ -88,24 +92,27 @@ function render() {
   const g=goal(),c=chapter();
   const root=document.getElementById('app');
   if(!root||!alive)return;
-  root.innerHTML=`<div class="shell">${sidebar(g)}<div class="workspace">${header(g)}<div class="content"><div id="request-feedback"></div>${s.storageReadOnly?'<p role="alert">原有存档无法读取。此会话为只读，原始存档已保留。</p>':''}${c.evaluationPending&&!pending&&!failure?'<button class="btn ghost" data-action="check-secrets">隐藏成就待判定 · Retry</button>':''}${s.view==='achievements'?achievementsPage(g):s.view==='settings'?settingsPage(g):dashboard(g)}</div></div></div><div id="modal-root"></div>`;
+  root.innerHTML=`<div class="shell">${sidebar(g)}<div class="workspace">${header(g)}<div class="content"><div id="request-feedback"></div>${s.storageReadOnly?'<p role="alert">原有存档无法读取。此会话为只读，原始存档已保留。</p>':''}${c?.evaluationPending&&!pending&&!failure?'<button class="btn ghost" data-action="check-secrets">隐藏成就待判定 · Retry</button>':''}${s.view==='settings'?settingsPage(g):!g?'<section class="quest-hero"><h1>还没有 Quest</h1><button class="btn primary" data-action="new-goal">创建 Quest</button></section>':s.view==='achievements'?achievementsPage(g):dashboard(g)}</div></div></div><div id="modal-root"></div>`;
   if(!document.getElementById('toast-container')){const n=document.createElement('div');n.id='toast-container';n.setAttribute('role','status');document.body.append(n);}
   if(modal)renderModal();
   feedback();tickEvilClock();
   root.querySelectorAll('button,select,textarea,input').forEach(el=>{if(pending)el.disabled=true;});
 }
-function openModal(kind,taskId){failure=null;retry=null;modal={kind,taskId};renderModal();}
-function closeModal(){modal=null;failure=null;retry=null;document.getElementById('modal-root').innerHTML='';feedback();}
-function renderModal(){const root=document.getElementById('modal-root');if(!modal){root.innerHTML='';return;}let body='';const g=goal(),c=chapter();if(modal.kind==='new-goal'){body=`<div class="card-label">CREATE A NEW QUEST</div><h2>What do you want to achieve?</h2><p>写下你的起点和目标，DeepSeek 将为你规划章节。</p><form id="goal-form"><label class="field-label" for="goal-description">GOAL DESCRIPTION</label><textarea id="goal-description" name="description" class="field" placeholder="例如：我想从零开始学 Python，做出一个自己的项目" maxlength="600" minlength="3" required>${esc(modal.draft||'')}</textarea><div class="modal-actions"><button type="button" class="btn ghost" data-action="close-modal">取消</button><button type="submit" class="btn primary">生成 Quest →</button></div></form>`;}
+function openModal(kind,taskId){failure=null;retry=null;modal={kind,taskId,goalId:goal()?.id};renderModal();}
+function closeModal(){document.querySelector('#app .shell')?.removeAttribute('inert');modal=null;failure=null;retry=null;document.getElementById('modal-root').innerHTML='';feedback();}
+function renderModal(){const root=document.getElementById('modal-root');if(!modal){root.innerHTML='';return;}document.querySelector('#app .shell')?.setAttribute('inert','');let body='';const g=goal(),c=chapter();if(modal.kind==='new-goal'){body=`<div class="card-label">CREATE A NEW QUEST</div><h2>What do you want to achieve?</h2><p>写下你的起点和目标，DeepSeek 将为你规划章节。</p><form id="goal-form"><label class="field-label" for="goal-description">GOAL DESCRIPTION</label><textarea id="goal-description" name="description" class="field" placeholder="例如：我想从零开始学 Python，做出一个自己的项目" maxlength="600" minlength="3" required>${esc(modal.draft||'')}</textarea><div class="modal-actions"><button type="button" class="btn ghost" data-action="close-modal">取消</button><button type="submit" class="btn primary">生成 Quest →</button></div></form>`;}
+else if(modal.kind==='quest-settings'||modal.kind==='delete-quest'){body=questSettingsDialog(g,modal.kind==='delete-quest');}
 else if(modal.kind==='edit-task'||modal.kind==='add-task'){const t=c.tasks.find(t=>t.id===modal.taskId),edit=!!t;body=`<div class="card-label">${edit?'EDIT QUEST':'CREATE CUSTOM QUEST'}</div><h2>${edit?'编辑任务':'添加任务'}</h2><p>${edit?'编辑未完成任务时，对应普通成就将同步更新。':'手动添加内容不会触发真实 AI 调用。'}</p><form id="task-form"><label class="field-label" for="task-title">TASK TITLE</label><input class="field" id="task-title" name="title" value="${edit?esc(t.title):''}" required maxlength="120"/><label class="field-label" for="task-desc">DESCRIPTION</label><textarea class="field" id="task-desc" name="description" required maxlength="500">${edit?esc(t.description):''}</textarea><label class="field-label" for="task-difficulty">DIFFICULTY</label><select class="field" id="task-difficulty" name="difficulty"><option value="easy" ${edit&&t.difficulty==='easy'?'selected':''}>Easy · 40 Task XP + 60 Achievement XP</option><option value="medium" ${edit&&t.difficulty==='medium'?'selected':''}>Medium · 80 Task XP + 120 Achievement XP</option><option value="hard" ${edit&&t.difficulty==='hard'?'selected':''}>Hard · 140 Task XP + 200 Achievement XP</option></select><label class="field-label" for="task-achievement">ACHIEVEMENT TITLE</label><input class="field" id="task-achievement" name="achievement" value="${edit?esc(t.achievement.title):''}" maxlength="100" placeholder="例如：First Steps" required/><div class="modal-actions"><button type="button" class="btn ghost" data-action="close-modal">取消</button><button type="submit" class="btn primary">${edit?'Save Changes':'Add Task'}</button></div></form>`;}
 else if(modal.kind==='delete-task'){const t=c.tasks.find(t=>t.id===modal.taskId);body=`<div class="card-label">CONFIRM ACTION</div><h2>删除任务？</h2><p>删除「${esc(t?.title)}」也会删除其对应的普通成就。此操作不能撤销。</p><div class="modal-actions"><button class="btn ghost" data-action="close-modal">取消</button><button class="btn danger" data-action="confirm-delete">删除任务</button></div>`;}
 else if(modal.kind==='regenerate'){body=`<div class="card-label">REGENERATE TASKS</div><h2>重新生成本章？</h2><p>保留所有已完成任务及普通成就，只替换未完成的任务。生成成功后才替换。</p><div class="modal-actions"><button class="btn ghost" data-action="close-modal">取消</button><button class="btn warning" data-action="confirm-regen">重新生成</button></div>`;}
 else if(modal.kind==='reward'){
   body=rewardDialog(offer(s,g,c),c,xp(g),s.evilMode);
 }
-root.innerHTML=`<div class="modal-bg" id="modal-overlay"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(modal.kind)}">${body}<div class="modal-feedback"></div></div></div>`;setTimeout(()=>root.querySelector('input,textarea')?.focus(),30);}
+root.innerHTML=`<div class="modal-bg" id="modal-overlay"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(modal.kind)}">${body}<div class="modal-feedback"></div></div></div>`;setTimeout(()=>(root.querySelector('input,textarea')||root.querySelector('button'))?.focus(),30);}
 function getTask(idValue){return chapter().tasks.find(t=>t.id===idValue)}
 function act(element){const action=element.dataset.action,taskId=element.dataset.id,g=goal(),c=chapter();if(pending)return;
+if(action==='quest-settings'||action==='delete-quest')return openModal(action);
+if(action==='confirm-delete-quest' && modal?.kind==='delete-quest')return applyQuestSettings(() => deleteQuest(s, modal.goalId));
 if(action==='retry'){if(modal?.kind==='new-goal')return document.getElementById('goal-form').requestSubmit();return retry?.();}
 if(action==='check-secrets')return run('判定隐藏成就…',()=>checkSecrets(g,c));
 if(action==='claim'){if(!s.evilMode){offer(s,g,c).normalClaimed=true;persist();}return openModal('reward');}
@@ -121,7 +128,20 @@ if(action==='view')setView(element.dataset.view);else if(action==='chapter')swit
 
 const handleClick=event=>{const target=event.target.closest('[data-action]');if(target){act(target);return;}if(!pending&&event.target.id==='modal-overlay')closeModal();};
 const handleKeydown=event=>{if(pending)return;if(event.key==='Escape'&&modal){closeModal();return;}if((event.key==='Enter'||event.key===' ')&&event.target.matches('[role="button"][data-action]')){event.preventDefault();act(event.target);}};
-const handleSubmit=event=>{if(event.target.id==='goal-form'){event.preventDefault();const form=event.target,description=String(new FormData(form).get('description')||'').trim();if(!description)return;if(pending)return;modal.draft=description;
+function applyQuestSettings(change){
+  try {
+    const next=change();
+    if(!persist(next))return;
+    closeModal();onlyCompleted=false;render();
+  } catch(error){notify(error.message,true);}
+}
+const handleSubmit=event=>{
+  if(event.target.id==='quest-settings-form'){
+    event.preventDefault();
+    if(!pending && modal?.kind==='quest-settings')applyQuestSettings(() => renameQuest(s, modal.goalId, String(new FormData(event.target).get('title')??'')));
+    return;
+  }
+  if(event.target.id==='goal-form'){event.preventDefault();const form=event.target,description=String(new FormData(form).get('description')||'').trim();if(!description)return;if(pending)return;modal.draft=description;
 return run('DeepSeek 正在规划章节…',async()=>{
   const data=await requestQuest('goals/generate',{goal:description,language:/[\u3400-\u9fff]/.test(description)?'zh':'en'});
   const g=generatedGoal(description,data);s.goals.unshift(g);s.selectedGoalId=g.id;s.selectedChapterId=g.chapters[0].id;s.view='dashboard';closeModal();persist();notify('Quest 已创建 · '+g.chapters.length+' 个章节');
