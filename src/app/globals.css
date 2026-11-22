@@ -59,3 +59,15 @@
 .task-copy{min-width:0;overflow-wrap:anywhere}.task-copy .achievement-label{display:inline-block;margin-top:4px}
 .secondary-copy{margin:9px 0;padding-inline-start:10px;border-inline-start:2px solid var(--stroke)}
 .secondary-copy .task-title{font-size:.89em;color:#bfccd2}.translate-task{margin:6px 0}
+
+/* Chapter-end ceremony: virtual stamp, then recalculation to a verified 100%. */
+.virtual-seal{width:146px;min-height:146px;border:3px double #e3b67c;border-radius:50%;margin:14px auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;color:#ffd59c;background:radial-gradient(circle,#6c422b40 0%,transparent 72%);box-shadow:0 0 0 5px #f8cf8a10,inset 0 0 0 5px #f8cf8a13;transform:rotate(-9deg)}
+.virtual-seal span{font-size:11px;font-weight:900;letter-spacing:.11em;line-height:1.4}
+.virtual-seal b{font:700 54px/1 ui-monospace,monospace}
+.virtual-seal.waiting{border-style:dashed;opacity:.62;transform:rotate(-9deg) scale(.92)}
+.virtual-seal.applied{animation:virtual-stamp-drop .48s cubic-bezier(.2,1.5,.45,1) both}
+.reward-stage.verified strong{color:#dafa9a}
+.claim-gauge.recalculate-complete i{animation:recalculate-to-hundred 1.05s ease-out both}
+@keyframes virtual-stamp-drop{from{opacity:.35;transform:rotate(-18deg) scale(1.36)}70%{opacity:1;transform:rotate(-8deg) scale(.94)}to{transform:rotate(-9deg) scale(1)}}
+@keyframes recalculate-to-hundred{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media(prefers-reduced-motion:reduce){.virtual-seal.applied,.claim-gauge.recalculate-complete i{animation:none}}
