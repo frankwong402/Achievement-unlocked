@@ -51,7 +51,7 @@ export function mergeChapter(c, data, replace) {
     if(titles.has(key(row.title))) throw new Error(label("AI 返回了重复任务，请重试。", "The AI returned duplicate tasks. Please retry."));
     titles.add(key(row.title));
     return {...makeTask([row.title,row.description,row.difficulty,row.achievementTitle]),
-      completionCriteria:row.completionCriteria, metadata:{source:'deepseek-v4-flash'}};
+      completionCriteria:row.completionCriteria, locales:row.locales, metadata:{source:'deepseek-v4-flash'}};
   });
   const seen = new Set(c.hidden.map(h=>key(h.title)));
   const extra = data.hiddenAchievements.filter(h=>{

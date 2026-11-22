@@ -56,3 +56,6 @@
 @keyframes claim-fill{from{transform:scaleX(.3)}}
 @keyframes claim-check{from{transform:scale(.8)}}
 .topbar .language-toggle{flex-shrink:0;white-space:nowrap}
+.task-copy{min-width:0;overflow-wrap:anywhere}.task-copy .achievement-label{display:inline-block;margin-top:4px}
+.secondary-copy{margin:9px 0;padding-inline-start:10px;border-inline-start:2px solid var(--stroke)}
+.secondary-copy .task-title{font-size:.89em;color:#bfccd2}.translate-task{margin:6px 0}

@@ -8,7 +8,7 @@ export async function POST(request) {
   try {
     const input=validateChapterInput(await bodyFrom(request));
     const data=await completeJson(chapterMessages(input),
-      value=>validateChapterBatch(value,input.existingTasks),5000,request);
+      value=>validateChapterBatch(value,input.existingTasks,input.language),5000,request);
     return ok(data);
   } catch(error) { return toError(error); }
 }

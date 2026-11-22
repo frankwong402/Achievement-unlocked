@@ -53,14 +53,14 @@ export function validateGoalOutput(value) {
     metadata: meta(value.metadata)
   };
 }
-export function validateChapterOutput(value) {
+export function validateChapterOutput(value, language) {
   if (!record(value)) throw new ContractError("INVALID_SCHEMA", "Chapter response must be a JSON object");
   const tasks = list(value.tasks, "tasks", 25, 1).map((t) => {
     if (!record(t)) throw new ContractError("INVALID_SCHEMA", "Each task must be an object");
     if (!["easy", "medium", "hard"].includes(t.difficulty)) {
       throw new ContractError("INVALID_SCHEMA", "difficulty must be easy, medium or hard");
     }
-    return {
+    const row = {
       title: text(t.title, "task.title", 130),
       description: text(t.description, "task.description", 500),
       difficulty: t.difficulty,
@@ -68,6 +68,11 @@ export function validateChapterOutput(value) {
       completionCriteria: text(t.completionCriteria, "task.completionCriteria", 300),
       metadata: meta(t.metadata)
     };
+    if (language) {
+      const other = language === "en" ? "zh" : "en";
+      row.locales = {[language]:taskCopy(row),[other]:taskCopy(t.translation)};
+    }
+    return row;
   });
   const uniqueTitles = new Set(tasks.map(t => t.title.toLowerCase()));
   if (uniqueTitles.size !== tasks.length) throw new ContractError("INVALID_SCHEMA", "Duplicate task titles");
@@ -144,17 +149,39 @@ export function parseModelJson(content) {
 }
 
 // Validate the entire response first, then retain only novel tasks in a follow-up batch.
-export function validateChapterBatch(value, existingTasks) {
-  const batch = validateChapterOutput(value);
+export function validateChapterBatch(value, existingTasks, language) {
+  const batch = validateChapterOutput(value,language);
   const key = title => title.normalize('NFKC').trim().toLowerCase();
   const existing = new Set(existingTasks.map(task => key(task.title)));
   const tasks = batch.tasks.filter(task => {
-    const title = key(task.title);
-    if (existing.has(title)) return false;
-    existing.add(title);
+    const titles = [task.title,...Object.values(task.locales ?? {}).map(copy=>copy.title)].map(key);
+    if (titles.some(title=>existing.has(title))) return false;
+    titles.forEach(title=>existing.add(title));
     return true;
   });
   if (!tasks.length)
     throw new ContractError('INVALID_AI_RESPONSE', '本批任务全部重复，请重试。原有进度已保留。', 502);
   return {...batch, tasks};
+}
+
+// Bilingual copies contain text only. IDs, XP and completion state are never
+// accepted from the translator.
+export function taskCopy(value, withCriteria = true) {
+  if (!record(value)) throw new ContractError('INVALID_SCHEMA','Missing task text');
+  return {
+    title:text(value.title,'title',180),
+    description:text(value.description,'description',800),
+    achievementTitle:text(value.achievementTitle,'achievementTitle',150),
+    completionCriteria:withCriteria ? text(value.completionCriteria,'completionCriteria',500) : ''
+  };
+}
+
+export function validateTranslationInput(value) {
+  if (!record(value?.task)) throw new ContractError('INVALID_INPUT','Expected a task',400);
+  return taskCopy(value.task, Boolean(value.task.completionCriteria));
+}
+
+export function translatedTask(value, original) {
+  return {zh:taskCopy(value?.zh, Boolean(original.completionCriteria)),
+          en:taskCopy(value?.en, Boolean(original.completionCriteria))};
 }

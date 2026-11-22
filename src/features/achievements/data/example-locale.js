@@ -49,6 +49,26 @@ export function exampleView(goal) {
   if (!goal || goal.metadata?.source !== 'example' || currentLocale() !== 'en') return goal;
   const translate = record => ({...record, title:exampleText(goal,record.title), description:exampleText(goal,record.description)});
   return {...translate(goal), hidden:goal.hidden.map(translate), chapters:goal.chapters.map(chapter => ({
-    ...translate(chapter), tasks:chapter.tasks.map(translate), hidden:chapter.hidden.map(translate)
+    ...translate(chapter), hidden:chapter.hidden.map(translate)
   }))};
+}
+
+const badgeNames=new Map([
+  ['Alphabet Initiate','字母学徒'],['Sound Explorer','声音探索者'],['Word Collector','单词收藏家'],['First Voice','初次发声'],
+  ['Vowel Hunter','元音猎人'],['Day One Story','日常故事家'],['Sentence Builder','造句能手'],['Present Tense','现在时达人'],
+  ['Question Crafter','提问高手'],['Place Finder','方位侦探'],['Time Traveler','时光旅人'],['Cafe Regular','咖啡馆常客'],
+  ['City Navigator','城市领航员'],['Conversation Starter','话题发起人'],['Active Listener','专注听众'],['Micro Speaker','微演说家'],
+  ['Research Reader','研究阅读者'],['Essay Novice','写作新秀'],['Lecture Decoder','讲座解码者'],['Academic Tone','学术之声'],
+  ['Listening Challenger','听力挑战者'],['Reading Challenger','阅读挑战者'],['Essay Challenger','写作挑战者'],
+  ['Speaking Challenger','口语挑战者'],['Band Chaser','高分追逐者']
+]);
+
+export function exampleTaskCopies(goal,task) {
+  if(goal?.metadata?.source !== 'example' || task.completionCriteria) return null;
+  const title=english.get(task.title),description=english.get(task.description),badge=task.achievement.title;
+  if(!title || !description || !badgeNames.has(badge)) return null;
+  return {
+    zh:{title:task.title,description:task.description,achievementTitle:badgeNames.get(badge)},
+    en:{title,description,achievementTitle:badge}
+  };
 }

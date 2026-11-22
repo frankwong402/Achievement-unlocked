@@ -1,3 +1,4 @@
+import {originalText,taskCopies} from './task-text.js';
 import {label, currentLocale, loadLanguage, switchLanguage} from './locale.js';
 import {XP} from '../data/mock-content.js';
 import {esc} from './utils.js';
@@ -69,7 +70,8 @@ function setTask(g,c,t) {
   persist();render();
   const delta=xp(g)-previous;
   const level=Math.floor(xp(g)/1000)>Math.floor(previous/1000) ? ` · ${label("升级", "LEVEL UP")}` : '';
-  notify((t.completed?t.achievement.title:label("已撤销 ", "Undone · ")+t.title)+' · '+(delta>=0?'+':'')+delta+' XP'+level);
+  const copy=taskCopies(g,t)?.[currentLocale()] ?? originalText(t);
+  notify((t.completed?copy.achievementTitle:label("已撤销 ", "Undone · ")+copy.title)+' · '+(delta>=0?'+':'')+delta+' XP'+level);
   if(isLiveGoal(g))run(label("判定隐藏成就…", "Checking hidden achievements…"),()=>checkSecrets(g,c));
   else {mockEvaluateHidden(g);persist();render();}
 }
@@ -114,6 +116,16 @@ else if(modal.kind==='reward'){
 root.innerHTML=`<div class="modal-bg" id="modal-overlay"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(modal.kind)}">${body}<div class="modal-feedback"></div></div></div>`;setTimeout(()=>(root.querySelector('input,textarea')||root.querySelector('button'))?.focus(),30);}
 function getTask(idValue){return chapter().tasks.find(t=>t.id===idValue)}
 function act(element){const action=element.dataset.action,taskId=element.dataset.id,g=goal(),c=chapter();if(pending)return;
+if(action==='translate-task'){
+  const t=getTask(taskId);
+  if(!t || taskCopies(g,t))return;
+  return run(label('正在补全任务的中英双语…','Preparing bilingual task text…'),async()=>{
+    const locales=await requestQuest('tasks/translate',{task:originalText(t)});
+    const nextTask={...t,locales};
+    const chapters=g.chapters.map(ch=>ch.id===c.id?{...ch,tasks:ch.tasks.map(task=>task.id===t.id?nextTask:task)}:ch);
+    persist({...s,goals:s.goals.map(item=>item.id===g.id?{...item,chapters}:item)});
+  });
+}
 if(action==='language'){
   switchLanguage();render();
   document.querySelector('[data-action="language"]')?.focus();
@@ -153,7 +165,7 @@ const handleSubmit=event=>{
 return run(label("DeepSeek 正在规划章节…", "DeepSeek is planning your chapters…"),async()=>{
   const data=await requestQuest('goals/generate',{goal:description});
   const g=generatedGoal(description,data);s.goals.unshift(g);s.selectedGoalId=g.id;s.selectedChapterId=g.chapters[0].id;s.view='dashboard';closeModal();persist();notify(label("Quest 已创建 · ", "Quest created · ")+g.chapters.length+label(" 个章节", " chapters"));
-});}else if(event.target.id==='task-form'){event.preventDefault();const f=new FormData(event.target),title=String(f.get('title')||'').trim(),desc=String(f.get('description')||'').trim(),difficulty=String(f.get('difficulty')||'medium'),achName=String(f.get('achievement')||'').trim();if(!title||!desc||!achName||!XP[difficulty])return;if(modal.kind==='edit-task'){const t=getTask(modal.taskId);if(!t||t.completed){notify(label("已完成任务不能直接修改。", "Undo completion to edit this task."),true);return;}t.title=title;t.description=desc;t.difficulty=difficulty;t.achievement.title=achName;}else{const t=makeTask([title,desc,difficulty,achName]);chapter().tasks.push(t);chapter().generated=true;}closeModal();persist();render();notify(label("任务与对应 Achievement 已保存。", "Task and achievement saved."));}};
+});}else if(event.target.id==='task-form'){event.preventDefault();const f=new FormData(event.target),title=String(f.get('title')||'').trim(),desc=String(f.get('description')||'').trim(),difficulty=String(f.get('difficulty')||'medium'),achName=String(f.get('achievement')||'').trim();if(!title||!desc||!achName||!XP[difficulty])return;if(modal.kind==='edit-task'){const t=getTask(modal.taskId);if(!t||t.completed){notify(label("已完成任务不能直接修改。", "Undo completion to edit this task."),true);return;}if(t.title!==title || t.description!==desc || t.achievement.title!==achName)delete t.locales;t.title=title;t.description=desc;t.difficulty=difficulty;t.achievement.title=achName;}else{const t=makeTask([title,desc,difficulty,achName]);chapter().tasks.push(t);chapter().generated=true;}closeModal();persist();render();notify(label("任务与对应 Achievement 已保存。", "Task and achievement saved."));}};
 function tickEvilClock(){for(const el of document.querySelectorAll('[data-patina]')){const patina=patinaLabel(Number(el.dataset.patina),Date.now()+(rustPreview?84000:0));el.textContent=patina;el.classList.toggle('tarnished',patina!==label("闪耀", "Polished"));el.title=label("演示时间每 12 秒过一天，完成任务可擦亮一枚旧徽章。", "Every 12 seconds simulates one day. Complete a task to polish an old badge.");}const el=document.querySelector('[data-evil-clock]');if(!el)return;const seconds=Math.max(0,Math.ceil((Number(el.dataset.deadline)-Date.now())/1000));el.textContent=seconds?'00:'+String(seconds).padStart(2,'0'):label("已过期 · 仍可领取", "Expired · Still claimable");}
 const evilClockTimer=setInterval(tickEvilClock,1000);
 const selectGoal=e=>{if(e.target.id==='goal-picker'&&!pending)switchGoal(e.target.value);};
